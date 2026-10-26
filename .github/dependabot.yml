@@ -9,11 +9,10 @@ updates:
       npm-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Expo SDK pins react / react-native / expo-* versions; upgrade them
-      # together with `npx expo install --fix`, not one by one.
-      - dependency-name: expo
-        update-types: [version-update:semver-major]
-      - dependency-name: expo-*
+      # No automatic major upgrades for any npm package: Expo SDK 58 pins
+      # compatible versions (TypeScript, AsyncStorage, Vite plugins...), so
+      # majors are done deliberately with `npx expo install --fix`.
+      - dependency-name: '*'
         update-types: [version-update:semver-major]
       - dependency-name: react-native
       - dependency-name: react
