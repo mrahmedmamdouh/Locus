@@ -23,6 +23,21 @@ export function SensorBanners() {
           (barometer columns will be empty).
         </Banner>
       ) : null}
+      {!demo && baro.status === 'permission-denied' ? (
+        <Card>
+          <H2>Motion &amp; Fitness is off</H2>
+          <Body>
+            iPhone reads the barometer through Motion &amp; Fitness, and that permission is denied, so the barometer cannot be used.
+            Readings would be GPS-only (barometer columns empty), which is not useful for this test.
+          </Body>
+          <View style={{ height: space.sm }} />
+          <Muted>To fix: Settings › Privacy &amp; Security › Motion &amp; Fitness › turn on Fitness Tracking and Locus. Then come back and tap Check again.</Muted>
+          <View style={{ height: space.md }} />
+          <Button title="Open Settings" variant="secondary" onPress={() => void Linking.openSettings()} />
+          <View style={{ height: space.sm }} />
+          <Button title="Check again" variant="secondary" onPress={baro.recheckPermission} />
+        </Card>
+      ) : null}
       {!demo && location.permission !== 'granted' && location.permission !== 'unknown' ? (
         <Card>
           <H2>Location for GPS comparison</H2>

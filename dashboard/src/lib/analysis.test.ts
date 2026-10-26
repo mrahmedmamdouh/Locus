@@ -13,9 +13,30 @@ describe('analyze', () => {
     expect(a.venues).toBe(2);
   });
 
-  it('gives a verdict on the synthetic sample with the default gate', () => {
-    expect(['pass', 'fail']).toContain(a.gate.verdict);
+  it('the synthetic sample passes the default gate with the barometer', () => {
+    expect(a.gate.verdict).toBe('pass');
     expect(a.gate.summary.n).toBe(sample.length);
+    expect(a.gate.summary.p90AbsErrorFloors).not.toBeNull();
+    expect(a.gate.venues).toBe(2);
+  });
+
+  it('counts readings that use the fallback floor height', () => {
+    expect(a.fallbackFloorRows).toBe(0);
+    const old = sample.map((r) => ({ ...r, trueFloorHeightM: null }));
+    expect(analyze(old, DEFAULT_SETTINGS).fallbackFloorRows).toBe(sample.length);
+  });
+
+  it('gives the iOS OS source a floor accuracy', () => {
+    const os = a.bySource.find((s) => s.source === 'os')!;
+    expect(os.n).toBeGreaterThan(0);
+    expect(os.floorAccuracy).not.toBeNull();
+  });
+
+  it('only counts venues with enough readings per venue', () => {
+    const strict = { ...DEFAULT_SETTINGS, gate: { ...DEFAULT_SETTINGS.gate, minReadingsPerVenue: 1_000_000 } };
+    const g = analyze(sample, strict).gate;
+    expect(g.venues).toBe(0);
+    expect(g.verdict).toBe('insufficient-data');
   });
 
   it('orders the floor breakdown by floor index, not label', () => {

@@ -7,6 +7,7 @@ import { useSensors } from '../state/SensorContext';
 import { useNow } from '../hooks/useNow';
 import { liveEstimate } from '../logic/live';
 import { buildReading, readingOutcome, type SourceOutcome } from '../logic/reading';
+import { deviceModelLabel } from '../logic/device';
 import { makeId } from '../logic/ids';
 import { fmt, fmtSigned } from '../logic/numbers';
 import { DRIFT_WARNING_SECONDS, formatElapsed, secondsBetween } from '../logic/time';
@@ -54,7 +55,7 @@ export function TestScreen() {
 }
 
 function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; onEnd: () => void }) {
-  const { activeSession, venues, readings, addReading, settings } = useAppState();
+  const { activeSession, venues, readings, addReading, settings, setRecordingInProgress } = useAppState();
   const { baro, location, simHeightRef } = useSensors();
   const now = useNow(1000);
   const session = activeSession!;
@@ -67,12 +68,15 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
   const [last, setLast] = useState<Reading | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
+  /** Synchronous guard: state updates are async, so a fast double tap could otherwise start two recordings. */
+  const recordingRef = useRef(false);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      if (recordingRef.current) setRecordingInProgress(false);
     };
-  }, []);
+  }, [setRecordingInProgress]);
 
   // Demo mode: the simulated phone "moves" to the floor the tester selects.
   useEffect(() => {
@@ -96,42 +100,51 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
   const canRecord = !!trueFloor && !recording && (baroUsable || location.latest !== null);
 
   const record = async () => {
-    if (!trueFloor || recording) return;
+    if (!trueFloor || recordingRef.current) return;
+    recordingRef.current = true;
+    setRecordingInProgress(true);
     setError(null);
     setLast(null);
     const start = Date.now();
     setRecording({ secondsLeft: RECORD_MS / 1000, samples: 0 });
-    const window = baroUsable
-      ? await baro.collect(RECORD_MS, (count) => {
-          if (mounted.current) {
-            setRecording({ secondsLeft: Math.max(0, Math.ceil((RECORD_MS - (Date.now() - start)) / 1000)), samples: count });
-          }
-        })
-      : await new Promise<{ pressures: number[]; osRelAlts: number[]; epoch: string | null }>((resolve) =>
-          setTimeout(() => resolve({ pressures: [], osRelAlts: [], epoch: null }), 1000),
-        );
-    if (!mounted.current) return;
     try {
+      const window = baroUsable
+        ? await baro.collect(RECORD_MS, (count) => {
+            if (mounted.current) {
+              setRecording({ secondsLeft: Math.max(0, Math.ceil((RECORD_MS - (Date.now() - start)) / 1000)), samples: count });
+            }
+          })
+        : await new Promise<{ pressures: number[]; osRelAlts: number[]; epoch: string | null }>((resolve) =>
+            setTimeout(() => resolve({ pressures: [], osRelAlts: [], epoch: null }), 1000),
+          );
+      // Read the GPS fix AFTER the window from the ref (not the fix captured when Record was tapped);
+      // buildReading only keeps it if it was taken during the window.
       const reading = buildReading({
         id: makeId('r'),
         session,
         venue,
         trueFloor,
         baro: window,
-        gps: location.latest,
+        gps: location.getLatest(),
+        windowStart: new Date(start),
         now: new Date(),
-        deviceModel: Device.modelName ?? Device.deviceName ?? 'unknown',
+        deviceModel: deviceModelLabel({ modelName: Device.modelName, brand: Device.brand, modelId: Device.modelId }),
         platform: Platform.OS,
         note,
         demo: settings.demoMode,
       });
+      // Saved even if this screen unmounted meanwhile: a reading is never silently dropped.
       addReading(reading);
-      setLast(reading);
-      setNote('');
+      if (mounted.current) {
+        setLast(reading);
+        setNote('');
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not record the reading.');
+      if (mounted.current) setError(e instanceof Error ? e.message : 'Could not record the reading.');
     } finally {
-      setRecording(null);
+      recordingRef.current = false;
+      setRecordingInProgress(false);
+      if (mounted.current) setRecording(null);
     }
   };
 
@@ -170,7 +183,12 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
             sub={baroUsable ? 'relative to entrance, 2 s median' : 'no barometer'}
             big
           />
-          <Stat label="Estimated floor" value={live.baroFloor?.label ?? '—'} sub="from barometer" big />
+          <Stat
+            label="Estimated floor"
+            value={live.baroFloor?.label ?? (live.baroRelAltM !== null && baroUsable ? 'Off table' : '—')}
+            sub={live.baroFloor === null && live.baroRelAltM !== null && baroUsable ? 'off the floor table: recalibrate?' : 'from barometer'}
+            big
+          />
         </Row>
         <Row>
           {Platform.OS === 'ios' ? (
@@ -181,7 +199,7 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
             value={gpsUsable ? fmtSigned(live.gpsRelAltM, 1, 'm') : 'n/a'}
             sub={
               location.latest
-                ? `±${fmt(location.latest.altitudeAccuracy, 0)} m vert · ±${fmt(location.latest.accuracy, 0)} m horiz · floor ${live.gpsFloor?.label ?? '—'}`
+                ? `±${fmt(location.latest.altitudeAccuracy, 0)} m vert · ±${fmt(location.latest.accuracy, 0)} m horiz · floor ${live.gpsFloor?.label ?? (live.gpsRelAltM !== null ? 'off the floor table' : '—')}`
                 : 'waiting for fix'
             }
           />
@@ -254,7 +272,12 @@ function SourceLine({ name, o }: { name: string; o: SourceOutcome }) {
   const color = o.correct === null ? colors.muted : o.correct ? colors.good : colors.bad;
   return (
     <Text style={[st.sourceLine, { color }]}>
-      {name}: {o.estFloorLabel === null ? 'no data' : `floor ${o.estFloorLabel} · error ${fmtSigned(o.errorM, 2, 'm')}`}
+      {name}:{' '}
+      {o.offTable
+        ? `Off the floor table · error ${fmtSigned(o.errorM, 2, 'm')}`
+        : o.estFloorLabel === null
+          ? 'no data'
+          : `floor ${o.estFloorLabel} · error ${fmtSigned(o.errorM, 2, 'm')}`}
       {o.correct === null ? '' : o.correct ? '  ✓' : '  ✗'}
     </Text>
   );

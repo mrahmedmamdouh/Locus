@@ -154,14 +154,15 @@ function SummaryLine({ name, s }: { name: string; s: AccuracySummary }) {
 }
 
 function ReadingRow({ r, onDelete }: { r: Reading; onDelete: () => void }) {
-  const ok = r.estFloorIndexBaro === null ? null : r.estFloorIndexBaro === r.trueFloorIndex;
+  // A barometer height off the floor table counts as wrong; no barometer height = no verdict.
+  const ok = r.baroRelAltM === null ? null : r.estFloorIndexBaro === r.trueFloorIndex;
   const err = r.baroRelAltM === null ? null : r.baroRelAltM - r.trueFloorCenterM;
   const gpsErr = r.gpsRelAltM === null ? null : r.gpsRelAltM - r.trueFloorCenterM;
   return (
     <View style={[st.row, { borderLeftColor: ok === null ? colors.border : ok ? colors.good : colors.bad }]}>
       <View style={{ flex: 1 }}>
         <Text style={st.rowTitle}>
-          True {r.trueFloorLabel} · baro est {r.estFloorIndexBaro ?? '—'} ({fmtSigned(err, 2, 'm')}) · GPS est {r.estFloorIndexGps ?? '—'} (
+          True {r.trueFloorLabel} · baro est {r.estFloorIndexBaro ?? (r.baroRelAltM !== null ? 'off table' : '—')} ({fmtSigned(err, 2, 'm')}) · GPS est {r.estFloorIndexGps ?? (r.gpsRelAltM !== null ? 'off table' : '—')} (
           {fmtSigned(gpsErr, 1, 'm')})
         </Text>
         <Muted>

@@ -30,7 +30,7 @@ export default function App() {
 }
 
 function Root() {
-  const { ready, settings, storageError, venues } = useAppState();
+  const { ready, settings, storageError, venues, recordingInProgress } = useAppState();
   const [tab, setTab] = useState<Tab | null>(null);
   if (!ready) {
     return (
@@ -64,9 +64,13 @@ function Root() {
               <Pressable
                 key={t.key}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                onPress={() => setTab(t.key)}
-                style={st.tab}
+                accessibilityState={{ selected: on, disabled: recordingInProgress && !on }}
+                disabled={recordingInProgress}
+                onPress={() => {
+                  // Never leave the Test tab mid-recording (the reading would be cut short).
+                  if (!recordingInProgress) setTab(t.key);
+                }}
+                style={[st.tab, recordingInProgress && !on && st.tabOff]}
               >
                 <Text style={[st.tabText, on && st.tabTextOn]}>{t.label}</Text>
                 {t.key === 'settings' && settings.demoMode ? <Text style={st.demo}>DEMO</Text> : null}
@@ -87,5 +91,6 @@ const st = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 56 },
   tabText: { fontSize: 15, color: colors.muted, fontWeight: '600' },
   tabTextOn: { color: colors.primary },
+  tabOff: { opacity: 0.4 },
   demo: { fontSize: 10, color: colors.warn, fontWeight: '700' },
 });

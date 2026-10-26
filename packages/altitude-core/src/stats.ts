@@ -7,10 +7,25 @@ export function altitudeFor(r: Reading, source: AltitudeSource): number | null {
   return v === null || !Number.isFinite(v) ? null : v;
 }
 
-function estFloorFor(r: Reading, source: AltitudeSource): number | null {
-  if (source === 'baro') return r.estFloorIndexBaro;
-  if (source === 'gps') return r.estFloorIndexGps;
-  return null;
+/**
+ * Floor height to judge a reading against: the true floor's own band height
+ * recorded at capture, else the caller's fallback.
+ */
+export function floorHeightFor(r: Reading, fallbackM: number): number {
+  const h = r.trueFloorHeightM;
+  return h !== null && h !== undefined && Number.isFinite(h) && h > 0 ? h : fallbackM;
+}
+
+/**
+ * Whether the estimated floor matches the true floor. Baro and GPS use the
+ * floor estimated on the phone; the iOS OS altimeter has no stored estimate,
+ * so it counts as correct when within half of the true floor's height.
+ */
+function floorCorrect(r: Reading, source: AltitudeSource, fallbackFloorM: number): boolean | null {
+  if (source === 'baro') return r.estFloorIndexBaro === null ? null : r.estFloorIndexBaro === r.trueFloorIndex;
+  if (source === 'gps') return r.estFloorIndexGps === null ? null : r.estFloorIndexGps === r.trueFloorIndex;
+  const alt = altitudeFor(r, source);
+  return alt === null ? null : Math.abs(alt - r.trueFloorCenterM) < floorHeightFor(r, fallbackFloorM) / 2;
 }
 
 export interface AccuracySummary {
@@ -24,26 +39,38 @@ export interface AccuracySummary {
   medianAbsErrorM: number | null;
   p90AbsErrorM: number | null;
   maxAbsErrorM: number | null;
-  /** Share of readings with |error| below half a floor height (0–1). */
+  /** 90th percentile of |error| measured in floors (|error| / that reading's floor height). */
+  p90AbsErrorFloors: number | null;
+  /** Share of readings with |error| below half of their own floor's height (0–1). */
   withinHalfFloor: number | null;
 }
 
-/** Accuracy of one altitude source over a set of readings. */
+/** Readings that have a value for the given altitude source. */
+export function usableReadings(readings: Reading[], source: AltitudeSource): Reading[] {
+  return readings.filter((r) => altitudeFor(r, source) !== null);
+}
+
+/**
+ * Accuracy of one altitude source over a set of readings.
+ * @param floorHeightM fallback floor height for rows exported without `trueFloorHeightM`
+ */
 export function summarize(readings: Reading[], source: AltitudeSource, floorHeightM: number): AccuracySummary {
-  const usable = readings.filter((r) => altitudeFor(r, source) !== null);
+  const usable = usableReadings(readings, source);
   const errors = usable.map((r) => altitudeFor(r, source)! - r.trueFloorCenterM);
   const abs = errors.map(Math.abs);
-  const withFloor = usable.filter((r) => estFloorFor(r, source) !== null);
-  const correct = withFloor.filter((r) => estFloorFor(r, source) === r.trueFloorIndex).length;
+  const inFloors = usable.map((r, i) => abs[i]! / floorHeightFor(r, floorHeightM));
+  const verdicts = usable.map((r) => floorCorrect(r, source, floorHeightM)).filter((v) => v !== null);
+  const correct = verdicts.filter(Boolean).length;
   return {
     source,
     n: usable.length,
-    floorAccuracy: withFloor.length ? correct / withFloor.length : null,
+    floorAccuracy: verdicts.length ? correct / verdicts.length : null,
     meanErrorM: mean(errors),
     medianAbsErrorM: median(abs),
     p90AbsErrorM: percentile(abs, 90),
     maxAbsErrorM: abs.length ? abs.reduce((m, e) => (e > m ? e : m), -Infinity) : null,
-    withinHalfFloor: abs.length ? abs.filter((e) => e < floorHeightM / 2).length / abs.length : null,
+    p90AbsErrorFloors: percentile(inFloors, 90),
+    withinHalfFloor: inFloors.length ? inFloors.filter((e) => e < 0.5).length / inFloors.length : null,
   };
 }
 
@@ -98,8 +125,10 @@ export interface GateCriteria {
   maxP90FractionOfFloor: number;
   /** Minimum readings for a verdict to count. */
   minReadings: number;
-  /** Minimum distinct venues. */
+  /** Minimum distinct venues, each with at least `minReadingsPerVenue` usable readings. */
   minVenues: number;
+  /** A venue only counts towards `minVenues` with at least this many usable readings. */
+  minReadingsPerVenue: number;
 }
 
 /** Gate 1 of the roadmap: "floors separable". Defaults match the strategy doc's 85% target. */
@@ -108,6 +137,7 @@ export const DEFAULT_GATE: GateCriteria = {
   maxP90FractionOfFloor: 0.5,
   minReadings: 200,
   minVenues: 2,
+  minReadingsPerVenue: 30,
 };
 
 export type GateVerdict = 'pass' | 'fail' | 'insufficient-data';
@@ -127,28 +157,34 @@ export function evaluateGate(
   criteria: GateCriteria = DEFAULT_GATE,
 ): GateResult {
   const summary = summarize(readings, source, floorHeightM);
-  const venues = new Set(readings.map((r) => r.venueId)).size;
+  // Only venues with enough readings FOR THIS SOURCE count.
+  const perVenue = new Map<string, number>();
+  for (const r of usableReadings(readings, source)) perVenue.set(r.venueId, (perVenue.get(r.venueId) ?? 0) + 1);
+  const venues = [...perVenue.values()].filter((n) => n >= criteria.minReadingsPerVenue).length;
   const reasons: string[] = [];
   if (summary.n < criteria.minReadings) {
     reasons.push(`Only ${summary.n} readings; need at least ${criteria.minReadings}.`);
   }
   if (venues < criteria.minVenues) {
-    reasons.push(`Only ${venues} venue(s); need at least ${criteria.minVenues}.`);
+    reasons.push(
+      `Only ${venues} venue(s) with at least ${criteria.minReadingsPerVenue} readings; need ${criteria.minVenues}.`,
+    );
   }
   if (reasons.length > 0) return { verdict: 'insufficient-data', reasons, summary, venues };
 
-  const limit = criteria.maxP90FractionOfFloor * floorHeightM;
   if (summary.floorAccuracy === null || summary.floorAccuracy < criteria.minFloorAccuracy) {
     reasons.push(
       `Floor accuracy ${pct(summary.floorAccuracy)} is below ${pct(criteria.minFloorAccuracy)}.`,
     );
   }
-  if (summary.p90AbsErrorM === null || summary.p90AbsErrorM >= limit) {
-    reasons.push(`90th-percentile error ${fmt(summary.p90AbsErrorM)} m is not below ${fmt(limit)} m.`);
+  if (summary.p90AbsErrorFloors === null || summary.p90AbsErrorFloors >= criteria.maxP90FractionOfFloor) {
+    reasons.push(
+      `90th-percentile error is ${fmt(summary.p90AbsErrorFloors)} of a floor (${fmt(summary.p90AbsErrorM)} m); must be below ${fmt(criteria.maxP90FractionOfFloor)}.`,
+    );
   }
   if (reasons.length === 0) {
     reasons.push(
-      `Floor accuracy ${pct(summary.floorAccuracy)} and 90th-percentile error ${fmt(summary.p90AbsErrorM)} m meet the gate.`,
+      `Floor accuracy ${pct(summary.floorAccuracy)} and 90th-percentile error ${fmt(summary.p90AbsErrorFloors)} of a floor (${fmt(summary.p90AbsErrorM)} m) meet the gate.`,
     );
     return { verdict: 'pass', reasons, summary, venues };
   }

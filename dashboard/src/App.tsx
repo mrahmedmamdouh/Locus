@@ -36,7 +36,7 @@ function ExplainPanel() {
       </p>
       <p>
         With the default criteria, the &ldquo;floors separable&rdquo; gate passes only when, across at least 200
-        readings in at least two malls, the chosen source puts the phone on the right floor at least 85% of the
+        readings in at least two malls (each with at least 30 readings), the chosen source puts the phone on the right floor at least 85% of the
         time and 9 in 10 readings are within half a floor of the truth. Fail means floor-level targeting is not yet reliable; insufficient data
         means collect more before deciding.
       </p>
@@ -158,7 +158,12 @@ export function App() {
             onClear={onClear}
             onExclusion={setExclusion}
           />
-          <SettingsPanel settings={settings} onChange={setSettings} />
+          <SettingsPanel
+            settings={settings}
+            onChange={setSettings}
+            loadedReadings={analysis?.total ?? 0}
+            fallbackReadings={analysis?.fallbackFloorRows ?? 0}
+          />
         </div>
 
         {analysis ? (
@@ -174,7 +179,7 @@ export function App() {
               />
               <ErrorScatter readings={included} />
             </div>
-            <ReadingsTable readings={included} source={settings.source} />
+            <ReadingsTable readings={included} source={settings.source} floorHeightM={settings.floorHeightM} />
           </>
         ) : dataset.readings.length > 0 ? (
           <section className="card empty" aria-label="All readings excluded">

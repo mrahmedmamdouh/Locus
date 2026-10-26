@@ -307,6 +307,11 @@ select {
   font-size: 0.78rem;
   color: var(--bad-ink);
 }
+.field-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
 
 .check {
   display: flex;
@@ -546,6 +551,15 @@ select {
   font-size: 1.4rem;
   font-weight: 650;
   letter-spacing: -0.01em;
+}
+.kpi-sub {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.cell-sub {
+  display: block;
+  font-variant-numeric: tabular-nums;
 }
 .kpi-target {
   font-size: 0.78rem;

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { generateSampleReadings, readingsToCsv } from '@locus/altitude-core';
+import { READING_COLUMNS, generateSampleReadings, readingsToCsv, summarize } from '@locus/altitude-core';
 import type { Reading } from '@locus/altitude-core';
 import {
   EMPTY_DATASET,
   addCsvText,
   addSource,
   applyExclusions,
+  countFallbackFloorHeight,
   filterReadings,
   isCorrect,
   mergeReadings,
@@ -17,7 +18,7 @@ import {
   DEFAULT_TABLE_FILTER,
   exportFileName,
 } from './data';
-import { parseBounded } from './settings';
+import { DEFAULT_SETTINGS, PARSE, parseBounded, validateGateCriteria } from './settings';
 
 const sample = generateSampleReadings(7, 3);
 const base = sample[0]!;
@@ -121,17 +122,17 @@ describe('filterReadings', () => {
   const ids = (xs: Reading[]) => xs.map((x) => x.id);
 
   it('filters by venue and device', () => {
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, venue: 'v1' }, 'baro'))).toEqual(['a', 'b']);
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, device: 'P' }, 'baro'))).toEqual(['a', 'c']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, venue: 'v1' }, 'baro', 4.5))).toEqual(['a', 'b']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, device: 'P' }, 'baro', 4.5))).toEqual(['a', 'c']);
   });
   it('filters by correctness for the chosen estimate source', () => {
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'correct' }, 'baro'))).toEqual(['a']);
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'incorrect' }, 'baro'))).toEqual(['b']);
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'no-estimate' }, 'baro'))).toEqual(['c']);
-    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'correct' }, 'gps'))).toEqual(['b', 'c']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'correct' }, 'baro', 4.5))).toEqual(['a']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'incorrect' }, 'baro', 4.5))).toEqual(['b']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'no-estimate' }, 'baro', 4.5))).toEqual(['c']);
+    expect(ids(filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: 'correct' }, 'gps', 4.5))).toEqual(['b', 'c']);
   });
   it('isCorrect returns null without an estimate', () => {
-    expect(isCorrect(rows[2]!, 'baro')).toBeNull();
+    expect(isCorrect(rows[2]!, 'baro', 4.5)).toBeNull();
   });
 });
 
@@ -205,5 +206,69 @@ describe('misc', () => {
   });
   it('exportFileName is filesystem-safe', () => {
     expect(exportFileName(new Date(2026, 9, 27, 9, 5))).toBe('locus-readings-20261027-0905.csv');
+  });
+});
+
+describe('iOS OS correctness', () => {
+  // True floor centre 9 m; this reading's own floor is 6 m tall (half = 3 m).
+  const os = (osRelAltM: number | null, trueFloorHeightM: number | null) =>
+    r({ id: `os-${osRelAltM}-${trueFloorHeightM}`, trueFloorCenterM: 9, trueFloorIndex: 2, osRelAltM, trueFloorHeightM, estFloorIndexBaro: 0 });
+
+  it("uses the reading's own floor height, not the baro estimate", () => {
+    expect(isCorrect(os(11.5, 6), 'os', 4.5)).toBe(true); // 2.5 m < 3 m
+    expect(isCorrect(os(12.5, 6), 'os', 4.5)).toBe(false); // 3.5 m >= 3 m
+  });
+  it('falls back to the given floor height when the row has none', () => {
+    expect(isCorrect(os(11.5, null), 'os', 4.5)).toBe(false); // 2.5 m >= 2.25 m
+    expect(isCorrect(os(11.5, null), 'os', 6)).toBe(true);
+  });
+  it('is null without an OS value', () => {
+    expect(isCorrect(os(null, 6), 'os', 4.5)).toBeNull();
+  });
+  it("agrees with the library's floor accuracy", () => {
+    const rows = sample.filter((x) => x.osRelAltM !== null);
+    const marked = rows.map((x) => isCorrect(x, 'os', 4.5));
+    const share = marked.filter((v) => v === true).length / marked.length;
+    expect(share).toBeCloseTo(summarize(rows, 'os', 4.5).floorAccuracy!, 10);
+  });
+  it('filters os rows by correctness', () => {
+    const rows = [os(11.5, 6), os(12.5, 6), os(null, 6)];
+    const f = (c: 'correct' | 'incorrect' | 'no-estimate') =>
+      filterReadings(rows, { ...DEFAULT_TABLE_FILTER, correctness: c }, 'os', 4.5).length;
+    expect([f('correct'), f('incorrect'), f('no-estimate')]).toEqual([1, 1, 1]);
+  });
+});
+
+describe('countFallbackFloorHeight', () => {
+  it('counts rows without a usable per-floor height', () => {
+    const rows = [r({ trueFloorHeightM: 5 }), r({ trueFloorHeightM: null }), r({ trueFloorHeightM: 0 }), r({ trueFloorHeightM: 4.2 })];
+    expect(countFallbackFloorHeight(rows)).toBe(2);
+    expect(countFallbackFloorHeight(sample)).toBe(0);
+  });
+  it('counts every row of an older CSV without the column', () => {
+    const cols = READING_COLUMNS.filter((c) => c !== 'trueFloorHeightM');
+    const old = [cols.join(','), ...sample.slice(0, 3).map((x) => cols.map((c) => String(x[c] ?? '')).join(','))].join('\n');
+    const ds = addCsvText(EMPTY_DATASET, 'old.csv', old);
+    expect(ds.files[0]!.errors).toEqual([]);
+    expect(ds.readings).toHaveLength(3);
+    expect(countFallbackFloorHeight(ds.readings)).toBe(3);
+  });
+});
+
+describe('gate criteria validation', () => {
+  it('accepts the defaults', () => {
+    expect(validateGateCriteria(DEFAULT_SETTINGS.gate)).toEqual([]);
+    expect(DEFAULT_SETTINGS.gate.minReadingsPerVenue).toBe(30);
+  });
+  it('rejects a bad min readings per venue', () => {
+    expect(validateGateCriteria({ ...DEFAULT_SETTINGS.gate, minReadingsPerVenue: 0 })).toHaveLength(1);
+    expect(validateGateCriteria({ ...DEFAULT_SETTINGS.gate, minReadingsPerVenue: 2.5 })[0]).toMatch(/per venue/);
+  });
+  it('parses the min readings per venue input', () => {
+    expect(PARSE.minReadingsPerVenue('30')).toBe(30);
+    expect(PARSE.minReadingsPerVenue('0')).toBeNull();
+    expect(PARSE.minReadingsPerVenue('12.5')).toBeNull();
+    expect(PARSE.minReadingsPerVenue('')).toBeNull();
+    expect(PARSE.minReadingsPerVenue('-3')).toBeNull();
   });
 });

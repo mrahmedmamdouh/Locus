@@ -1,5 +1,5 @@
 import type { GateCriteria, GateResult } from '@locus/altitude-core';
-import { SOURCE_LABEL, fmtM, fmtPct } from '../lib/data';
+import { SOURCE_LABEL, fmtFloors, fmtM, fmtPct } from '../lib/data';
 import type { Settings } from '../lib/settings';
 import { IconAlert, IconCheck, IconCross } from './common';
 
@@ -39,7 +39,6 @@ export function VerdictCard({
 }) {
   const { summary: s, verdict, venues } = gate;
   const c: GateCriteria = settings.gate;
-  const limitM = c.maxP90FractionOfFloor * settings.floorHeightM;
   const Icon = verdict === 'pass' ? IconCheck : verdict === 'fail' ? IconCross : IconAlert;
   return (
     <section className={`card verdict verdict-${verdict}`} aria-labelledby="verdict-title" aria-live="polite">
@@ -54,7 +53,7 @@ export function VerdictCard({
             <span className="sr-only"> Verdict: {VERDICT_TEXT[verdict]}.</span>
           </h2>
           <p className="card-sub">
-            Source: {SOURCE_LABEL[settings.source]} · floor height {settings.floorHeightM} m
+            Source: {SOURCE_LABEL[settings.source]} · fallback floor height {settings.floorHeightM} m
             {synthetic ? ' · includes SYNTHETIC demo data' : ''}
           </p>
           <ul className="verdict-reasons">
@@ -76,9 +75,10 @@ export function VerdictCard({
         <div className="kpi">
           <span className="kpi-label">p90 |error|</span>
           <span className="kpi-value">{fmtM(s.p90AbsErrorM)}</span>
+          <span className="kpi-sub">{fmtFloors(s.p90AbsErrorFloors)}</span>
           <Target
-            ok={s.p90AbsErrorM === null ? false : s.p90AbsErrorM < limitM}
-            text={`target < ${limitM.toFixed(2)} m`}
+            ok={s.p90AbsErrorFloors === null ? false : s.p90AbsErrorFloors < c.maxP90FractionOfFloor}
+            text={`target < ${c.maxP90FractionOfFloor.toFixed(2)} floors`}
           />
         </div>
         <div className="kpi">
@@ -89,7 +89,10 @@ export function VerdictCard({
         <div className="kpi">
           <span className="kpi-label">Venues</span>
           <span className="kpi-value">{venues}</span>
-          <Target ok={venues >= c.minVenues} text={`need ≥ ${c.minVenues}`} />
+          <Target
+            ok={venues >= c.minVenues}
+            text={`need ≥ ${c.minVenues}, each with ≥ ${c.minReadingsPerVenue.toLocaleString()} readings`}
+          />
         </div>
         <div className="kpi">
           <span className="kpi-label">Median |error|</span>

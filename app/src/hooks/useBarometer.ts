@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { Barometer, type BarometerMeasurement } from 'expo-sensors';
 import { createSimulator } from '../logic/simulator';
 import { makeId } from '../logic/ids';
@@ -14,12 +14,16 @@ export interface BaroSample {
   epoch: string;
 }
 
-export type BaroStatus = 'checking' | 'available' | 'unavailable' | 'simulated';
+export type BaroStatus = 'checking' | 'available' | 'unavailable' | 'permission-denied' | 'simulated';
 
 export interface BarometerApi {
   status: BaroStatus;
   /** Whether the real hardware has a barometer (independent of demo mode). */
   hardwareAvailable: boolean | null;
+  /** iOS: Motion & Fitness permission was denied, so the altimeter cannot be used (status 'permission-denied'). */
+  permissionDenied: boolean;
+  /** Re-check the permission (e.g. after the user returns from Settings). */
+  recheckPermission: () => void;
   /** Latest sample, refreshed for rendering at about 4 Hz. */
   latest: BaroSample | null;
   /** Samples from the last `ms` milliseconds of the current stream. */
@@ -41,6 +45,8 @@ const RENDER_INTERVAL_MS = 250;
 export function useBarometer(opts: { demo: boolean; simHeightRef: MutableRefObject<number> }): BarometerApi {
   const { demo, simHeightRef } = opts;
   const [hardwareAvailable, setHardwareAvailable] = useState<boolean | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [checkToken, setCheckToken] = useState(0);
   const [latest, setLatest] = useState<BaroSample | null>(null);
   const [epoch, setEpoch] = useState<string | null>(null);
   const bufferRef = useRef<BaroSample[]>([]);
@@ -51,16 +57,22 @@ export function useBarometer(opts: { demo: boolean; simHeightRef: MutableRefObje
     (async () => {
       try {
         const ok = Platform.OS === 'web' ? false : await Barometer.isAvailableAsync();
+        let denied = false;
         if (ok && Platform.OS === 'ios') {
           // CoreMotion altimeter needs Motion & Fitness permission (NSMotionUsageDescription).
           try {
-            const perm = await Barometer.getPermissionsAsync();
-            if (!perm.granted && perm.canAskAgain) await Barometer.requestPermissionsAsync();
+            let perm = await Barometer.getPermissionsAsync();
+            if (!perm.granted && perm.canAskAgain) perm = await Barometer.requestPermissionsAsync();
+            // Denied: the altimeter delivers no data, so treat the barometer as unusable.
+            denied = !perm.granted && perm.status === 'denied';
           } catch {
             // Older OS versions do not gate the altimeter; carry on.
           }
         }
-        if (!cancelled) setHardwareAvailable(ok);
+        if (!cancelled) {
+          setPermissionDenied(denied);
+          setHardwareAvailable(ok);
+        }
       } catch {
         if (!cancelled) setHardwareAvailable(false);
       }
@@ -68,11 +80,22 @@ export function useBarometer(opts: { demo: boolean; simHeightRef: MutableRefObje
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [checkToken]);
+
+  const recheckPermission = useCallback(() => setCheckToken((n) => n + 1), []);
+
+  // Coming back from Settings: re-check so granting Motion & Fitness takes effect without a restart.
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !permissionDenied) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') recheckPermission();
+    });
+    return () => sub.remove();
+  }, [permissionDenied, recheckPermission]);
 
   useEffect(() => {
     const useSim = demo;
-    const useReal = !demo && hardwareAvailable === true;
+    const useReal = !demo && hardwareAvailable === true && !permissionDenied;
     bufferRef.current = [];
     setLatest(null);
     if (!useSim && !useReal) {
@@ -117,7 +140,7 @@ export function useBarometer(opts: { demo: boolean; simHeightRef: MutableRefObje
       cleanup();
       clearInterval(renderId);
     };
-  }, [demo, hardwareAvailable, simHeightRef]);
+  }, [demo, hardwareAvailable, permissionDenied, simHeightRef]);
 
   const recent = useCallback((ms: number) => {
     const now = Date.now();
@@ -150,9 +173,11 @@ export function useBarometer(opts: { demo: boolean; simHeightRef: MutableRefObje
     ? 'simulated'
     : hardwareAvailable === null
       ? 'checking'
-      : hardwareAvailable
-        ? 'available'
-        : 'unavailable';
+      : !hardwareAvailable
+        ? 'unavailable'
+        : permissionDenied
+          ? 'permission-denied'
+          : 'available';
 
-  return { status, hardwareAvailable, latest, recent, epoch, collect };
+  return { status, hardwareAvailable, permissionDenied, recheckPermission, latest, recent, epoch, collect };
 }

@@ -84,7 +84,7 @@ For each reading:
 
 ## 5. Sample size and coverage
 
-The gate needs **at least 200 readings across at least 2 venues**. Aim higher so each phone and each country can be judged on its own:
+The gate needs **at least 200 readings across at least 2 venues, with at least 30 readings in each venue**. Aim higher so each phone and each country can be judged on its own:
 
 | Target | Minimum | Aim |
 | --- | --- | --- |
@@ -122,12 +122,12 @@ Suggested venues are large multi-level malls with atriums (in Cairo: e.g. Mall o
 
 ## 8. Reading the dashboard verdict
 
-Open the dashboard ([live](https://mrahmedmamdouh.github.io/Locus/)), load all CSVs from the test, and set the floor height you used. It shows accuracy per source (barometer, OS altitude on iOS, GPS), per device and per venue, plus a drift chart by minutes since calibration, and one verdict:
+Open the dashboard ([live](https://mrahmedmamdouh.github.io/Locus/)), and load all CSVs from the test. Each reading carries its own floor height from the app, so venues with different floor heights are judged correctly; the dashboard's floor height setting is only a fallback for files from older app builds. It shows accuracy per source (barometer, OS altitude on iOS, GPS), per device and per venue, plus a drift chart by minutes since calibration, and one verdict:
 
 | Verdict | Meaning | Next step |
 | --- | --- | --- |
-| **PASS** | Barometer floor accuracy ≥ 85% and p90 error < half a floor, on ≥ 200 readings from ≥ 2 venues | Proceed: build 3D geofences on barometric relative altitude. Check that each country and each phone class also passes on its own before relying on it there. |
-| **INSUFFICIENT DATA** | Under 200 readings or under 2 venues | Collect more (section 5). Do not read anything into the numbers yet. |
+| **PASS** | Barometer floor accuracy ≥ 85% and p90 error < half a floor, on ≥ 200 readings from ≥ 2 venues (≥ 30 readings each) | Proceed: build 3D geofences on barometric relative altitude. Check that each country and each phone class also passes on its own before relying on it there. |
+| **INSUFFICIENT DATA** | Under 200 readings, or under 2 venues with 30+ readings each | Collect more (section 5). Do not read anything into the numbers yet. |
 | **FAIL** | Enough data, but accuracy or p90 error misses the bar | Diagnose, then decide (below). |
 
 **On FAIL, diagnose first.** Look for a fixable cause before abandoning the approach:

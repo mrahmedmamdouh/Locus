@@ -83,16 +83,16 @@ All heights are metres relative to the calibration entrance (entrance floor = 0)
 
 ## The gate
 
-The dashboard applies `evaluateGate` with `DEFAULT_GATE` from [`stats.ts`](packages/altitude-core/src/stats.ts). Barometric altitude **passes** only if all four hold:
+The dashboard applies `evaluateGate` with `DEFAULT_GATE` from [`stats.ts`](packages/altitude-core/src/stats.ts). Barometric altitude **passes** only if all four hold. Each reading is judged against the height of its own floor, which the app stores in every row (`trueFloorHeightM`).
 
 | Criterion | Threshold |
 | --- | --- |
 | Floor accuracy (estimated floor = true floor) | ≥ 85% |
-| 90th-percentile absolute height error | < half a floor height |
+| 90th-percentile absolute height error | < 0.5 of that reading's floor height |
 | Readings | ≥ 200 |
-| Distinct venues | ≥ 2 |
+| Distinct venues, each with ≥ 30 readings for the evaluated source | ≥ 2 |
 
-Fewer than 200 readings or 2 venues gives **insufficient data**, not a fail. What to do with each verdict is in the [protocol](docs/field-test-protocol.md#8-reading-the-dashboard-verdict).
+Fewer than 200 readings, or fewer than 2 venues with 30+ readings each, gives **insufficient data**, not a fail. What to do with each verdict is in the [protocol](docs/field-test-protocol.md#8-reading-the-dashboard-verdict).
 
 ## Privacy
 

@@ -16,6 +16,7 @@ export const READING_COLUMNS = [
   'trueFloorLabel',
   'trueFloorIndex',
   'trueFloorCenterM',
+  'trueFloorHeightM',
   'pressureHpa',
   'baselinePressureHpa',
   'temperatureC',
@@ -37,6 +38,7 @@ const NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'secondsSinceCalibration',
   'trueFloorIndex',
   'trueFloorCenterM',
+  'trueFloorHeightM',
   'pressureHpa',
   'baselinePressureHpa',
   'temperatureC',
@@ -53,6 +55,12 @@ const NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'sampleCount',
 ]);
 
+/** Columns added after v0.1; files without them still load (value = null). */
+const OPTIONAL_COLUMNS: ReadonlySet<keyof Reading> = new Set<keyof Reading>(['trueFloorHeightM']);
+
+/** Characters that make a spreadsheet treat a text cell as a formula. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 /** Columns that must hold a number (never empty). */
 const REQUIRED_NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'secondsSinceCalibration',
@@ -66,7 +74,7 @@ function escapeCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   let s = typeof value === 'number' ? (Number.isFinite(value) ? String(value) : '') : String(value);
   // Neutralise spreadsheet formula injection (CSV opened in Excel/Sheets).
-  if (/^[=+\-@\t\r]/.test(s) && typeof value !== 'number') s = `'${s}`;
+  if (FORMULA_START.test(s) && typeof value !== 'number') s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -133,7 +141,7 @@ export function csvToReadings(text: string): ParseResult {
   const errors: string[] = [];
   if (rows.length === 0) return { readings: [], errors: ['File is empty.'] };
   const header = rows[0]!.map((h) => h.trim());
-  const missing = READING_COLUMNS.filter((c) => !header.includes(c));
+  const missing = READING_COLUMNS.filter((c) => !header.includes(c) && !OPTIONAL_COLUMNS.has(c));
   if (missing.length > 0) {
     return { readings: [], errors: [`Missing columns: ${missing.join(', ')}`] };
   }
@@ -141,18 +149,26 @@ export function csvToReadings(text: string): ParseResult {
   const readings: Reading[] = [];
   rows.slice(1).forEach((cells, n) => {
     const line = n + 2;
+    if (cells.length !== header.length) {
+      errors.push(`Row ${line}: has ${cells.length} cells, expected ${header.length}`);
+      return;
+    }
     const out: Record<string, unknown> = {};
     for (const col of READING_COLUMNS) {
-      const raw = (cells[idx.get(col)!] ?? '').trim();
+      const at = idx.get(col);
+      const cell = at === undefined ? '' : (cells[at] ?? '');
       if (NUMERIC.has(col)) {
+        const raw = cell.trim();
         if (raw === '') {
           out[col] = null;
         } else {
-          const num = Number(raw);
+          // Plain decimal numbers only (rejects hex like 0x1, Infinity, etc.).
+          const num = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(raw) ? Number(raw) : NaN;
           out[col] = Number.isFinite(num) ? num : NaN;
         }
       } else {
-        out[col] = raw.startsWith("'") && /^'[=+\-@]/.test(raw) ? raw.slice(1) : raw;
+        // Text is kept as written (no trimming); undo the formula-escaping quote.
+        out[col] = cell.startsWith("'") && FORMULA_START.test(cell.slice(1)) ? cell.slice(1) : cell;
       }
     }
     const bad = READING_COLUMNS.filter(

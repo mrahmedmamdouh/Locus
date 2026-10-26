@@ -65,6 +65,7 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
             trueFloorLabel: floor.label,
             trueFloorIndex: floor.index,
             trueFloorCenterM: floorCenterM(floor),
+            trueFloorHeightM: floor.zMaxM - floor.zMinM,
             pressureHpa: round(pressure, 3),
             baselinePressureHpa: round(baseline, 3),
             temperatureC: tempC,

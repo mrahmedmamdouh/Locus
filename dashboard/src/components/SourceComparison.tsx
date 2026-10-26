@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { AccuracySummary, AltitudeSource } from '@locus/altitude-core';
-import { SOURCE_LABEL, fmtM, fmtPct } from '../lib/data';
+import { SOURCE_LABEL, fmtFloors, fmtM, fmtPct } from '../lib/data';
 import { useChartPalette } from '../hooks/useChartPalette';
 import { Card, SummaryTable, TooltipBox } from './common';
 
@@ -26,7 +26,7 @@ export function SourceComparison({
   return (
     <Card
       title="Barometer vs GPS vs iOS OS altitude"
-      subtitle="Same readings, three altitude sources. Lower error is better; floor accuracy needs an on-device floor estimate (barometer and GPS only)."
+      subtitle="Same readings, three altitude sources. Lower error is better. Barometer and GPS floor accuracy uses the on-device floor estimate; iOS OS altitude counts as the correct floor when within half of that floor's height."
     >
       <SummaryTable
         caption="Accuracy by altitude source"
@@ -53,7 +53,7 @@ export function SourceComparison({
                     <TooltipBox
                       title={d.label}
                       rows={[
-                        ['p90 |error|', fmtM(d.p90)],
+                        ['p90 |error|', `${fmtM(d.p90)} (${fmtFloors(d.s.p90AbsErrorFloors)})`],
                         ['Median |error|', fmtM(d.s.medianAbsErrorM)],
                         ['Floor accuracy', fmtPct(d.s.floorAccuracy)],
                         ['n', String(d.s.n)],
@@ -84,8 +84,8 @@ export function SourceComparison({
         </div>
       )}
       <p className="chart-note">
-        Dashed line: half a floor ({half.toFixed(2)} m). A source whose bar crosses it confuses adjacent floors on
-        at least 1 reading in 10.
+        Dashed line: half of the fallback floor height ({half.toFixed(2)} m). The gate judges each reading against
+        its own floor&rsquo;s height; see p90 in floors in the table above.
       </p>
     </Card>
   );

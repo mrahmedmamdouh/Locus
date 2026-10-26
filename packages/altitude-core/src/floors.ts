@@ -62,13 +62,23 @@ export function validateFloors(floors: Floor[]): string[] {
 
 /**
  * Estimate the floor for a relative altitude.
- * Returns the floor whose band contains the altitude; if it falls in a gap or
- * outside all bands, returns the floor with the nearest centre.
+ * Returns the floor whose band contains the altitude; if it falls in a gap
+ * between bands, the floor with the nearest centre. Returns null when the
+ * altitude is more than half a floor beyond the lowest or highest band, so a
+ * large drift is never counted as "on the top floor".
  */
 export function classifyFloor(relAltM: number, floors: Floor[]): Floor | null {
   if (!Number.isFinite(relAltM) || floors.length === 0) return null;
   const inside = floors.find((f) => relAltM >= f.zMinM && relAltM < f.zMaxM);
   if (inside) return inside;
+  let lowest = floors[0]!;
+  let highest = floors[0]!;
+  for (const f of floors) {
+    if (f.zMinM < lowest.zMinM) lowest = f;
+    if (f.zMaxM > highest.zMaxM) highest = f;
+  }
+  if (relAltM >= highest.zMaxM + (highest.zMaxM - highest.zMinM) / 2) return null;
+  if (relAltM < lowest.zMinM - (lowest.zMaxM - lowest.zMinM) / 2) return null;
   let best: Floor | null = null;
   let bestDist = Infinity;
   for (const f of floors) {

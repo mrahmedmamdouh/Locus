@@ -72,6 +72,7 @@ function input(overrides: Partial<BuildReadingInput> = {}): BuildReadingInput {
     trueFloor: floor(2),
     baro,
     gps: fix(70 + 9 + 2), // GPS 2 m too high
+    windowStart: new Date(NOW.getTime() - 5000),
     now: NOW,
     deviceModel: 'Pixel 8',
     platform: 'android',
@@ -97,6 +98,7 @@ describe('buildReading', () => {
       trueFloorLabel: '2',
       trueFloorIndex: 2,
       trueFloorCenterM: 9,
+      trueFloorHeightM: 4.5,
       baselinePressureHpa: BASE,
       temperatureC: T,
       gpsLat: 30.07,
@@ -133,6 +135,29 @@ describe('buildReading', () => {
     expect(o.baro.errorM).toBeCloseTo(4.5, 2);
   });
 
+  it('records the true floor band height', () => {
+    const custom: Venue = {
+      ...venue,
+      floors: [
+        { label: 'G', index: 0, zMinM: -3, zMaxM: 3 },
+        { label: 'M', index: 1, zMinM: 3, zMaxM: 6.5 },
+      ],
+    };
+    expect(buildReading(input({ venue: custom, trueFloor: custom.floors[1]! })).trueFloorHeightM).toBe(3.5);
+  });
+
+  it('gives a null floor estimate when the height is off the floor table', () => {
+    // Floors span -6.75..15.75 m; 30 m is more than half a floor above the top band.
+    const r = buildReading(input({ baro: { pressures: [pressureAt(30)], osRelAlts: [], epoch: 'e1' }, gps: fix(70 - 40) }));
+    expect(r.baroRelAltM).toBeCloseTo(30, 1);
+    expect(r.estFloorIndexBaro).toBeNull();
+    expect(r.estFloorIndexGps).toBeNull();
+    const o = readingOutcome(r, venue.floors);
+    expect(o.baro).toMatchObject({ estFloorLabel: null, offTable: true, correct: false });
+    expect(o.gps).toMatchObject({ estFloorLabel: null, offTable: true, correct: false });
+    expect(o.os.offTable).toBe(false);
+  });
+
   it('keeps baro fields null on a phone without a barometer (GPS-only)', () => {
     const r = buildReading(
       input({
@@ -159,6 +184,10 @@ describe('buildReading', () => {
     const stale = buildReading(input({ gps: fix(80, 5 * 60_000) }));
     expect(stale.gpsLat).toBeNull();
     expect(stale.estFloorIndexGps).toBeNull();
+    // 6 s old: recent, but from before the 5 s window (could be the previous floor).
+    const beforeWindow = buildReading(input({ gps: fix(80, 6000) }));
+    expect(beforeWindow.gpsLat).toBeNull();
+    expect(beforeWindow.gpsRelAltM).toBeNull();
     const noBase = buildReading(
       input({ session: session({ calibration: { ...session().calibration, baselineGpsAltM: null } }) }),
     );

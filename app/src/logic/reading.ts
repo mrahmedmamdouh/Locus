@@ -7,7 +7,7 @@ import {
   type Reading,
   type Venue,
 } from '@locus/altitude-core';
-import { freshFix } from './gps';
+import { fixForWindow } from './gps';
 import { round, roundOrNull } from './numbers';
 import { secondsBetween } from './time';
 import type { BaroWindow, GpsFix, Session } from './types';
@@ -20,8 +20,10 @@ export interface BuildReadingInput {
   venue: Venue;
   trueFloor: Floor;
   baro: BaroWindow;
-  /** Latest GPS fix from the watcher; dropped if older than MAX_GPS_FIX_AGE_MS. */
+  /** Latest GPS fix from the watcher, read after the window; dropped unless taken during it (see fixForWindow). */
   gps: GpsFix | null;
+  /** When the sampling window started. */
+  windowStart: Date;
   now: Date;
   deviceModel: string;
   platform: string;
@@ -66,8 +68,8 @@ export function buildReading(input: BuildReadingInput): Reading {
       ? osNow - session.osRelAltBaselineM
       : null;
 
-  // GPS: latest fresh fix, altitude relative to the entrance fix.
-  const fix = freshFix(input.gps, now.getTime());
+  // GPS: a fix taken during the sampling window, altitude relative to the entrance fix.
+  const fix = fixForWindow(input.gps, input.windowStart.getTime(), now.getTime());
   const gpsAlt = fix && fix.altitude !== null && Number.isFinite(fix.altitude) ? fix.altitude : null;
   const gpsRelAltM =
     gpsAlt !== null && cal.baselineGpsAltM !== null ? gpsAlt - cal.baselineGpsAltM : null;
@@ -87,6 +89,7 @@ export function buildReading(input: BuildReadingInput): Reading {
     trueFloorLabel: trueFloor.label,
     trueFloorIndex: trueFloor.index,
     trueFloorCenterM: floorCenterM(trueFloor),
+    trueFloorHeightM: round(trueFloor.zMaxM - trueFloor.zMinM, 3),
     pressureHpa: roundOrNull(pressure, 4),
     baselinePressureHpa: baseline,
     temperatureC: cal.temperatureC,
@@ -107,6 +110,8 @@ export function buildReading(input: BuildReadingInput): Reading {
 
 export interface SourceOutcome {
   estFloorLabel: string | null;
+  /** True when there is a height but it is more than half a floor beyond the floor table. */
+  offTable: boolean;
   errorM: number | null;
   correct: boolean | null;
 }
@@ -123,13 +128,15 @@ function outcome(
   r: Reading,
   floors: Floor[],
 ): SourceOutcome {
-  if (relAlt === null) return { estFloorLabel: null, errorM: null, correct: null };
+  if (relAlt === null) return { estFloorLabel: null, offTable: false, errorM: null, correct: null };
   const idx = estIndex ?? classifyFloor(relAlt, floors)?.index ?? null;
   const label = idx === null ? null : (floors.find((f) => f.index === idx)?.label ?? String(idx));
   return {
     estFloorLabel: label,
+    offTable: idx === null,
     errorM: relAlt - r.trueFloorCenterM,
-    correct: idx === null ? null : idx === r.trueFloorIndex,
+    // Off the table is never the true floor (the true floor is always in the table).
+    correct: idx === null ? false : idx === r.trueFloorIndex,
   };
 }
 

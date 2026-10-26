@@ -1,6 +1,7 @@
 import { Platform, ScrollView, Switch, Text, View } from 'react-native';
 import * as Device from 'expo-device';
 import { useAppState } from '../state/AppState';
+import { deviceModelLabel } from '../logic/device';
 import { useSensors } from '../state/SensorContext';
 import { Body, Card, H1, H2, Muted } from '../ui/kit';
 import { colors, space } from '../ui/theme';
@@ -31,9 +32,10 @@ export function SettingsScreen() {
       </Card>
       <Card>
         <H2>This phone</H2>
-        <Body>Model: {Device.modelName ?? 'unknown'}</Body>
+        <Body>Model: {deviceModelLabel({ modelName: Device.modelName, brand: Device.brand, modelId: Device.modelId })}</Body>
         <Body>Platform: {Platform.OS} {String(Platform.Version)}</Body>
         <Body>Barometer hardware: {hw}</Body>
+        {baro.permissionDenied ? <Body>Motion &amp; Fitness permission: denied (barometer unusable)</Body> : null}
         <Body>Location permission: {location.permission}</Body>
         <Body>Stored: {sessions.length} session(s), {readings.length} reading(s)</Body>
       </Card>

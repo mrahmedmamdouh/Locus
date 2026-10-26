@@ -28,6 +28,9 @@ export interface AppStateValue {
   deleteReading: (id: string) => void;
   clearReadings: () => void;
   updateSettings: (patch: Partial<Settings>) => void;
+  /** True while a 5 s reading is being recorded; navigation is blocked meanwhile. */
+  recordingInProgress: boolean;
+  setRecordingInProgress: (on: boolean) => void;
 }
 
 const Ctx = createContext<AppStateValue | null>(null);
@@ -39,6 +42,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [recordingInProgress, setRecordingInProgress] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,8 +115,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       deleteReading: (id) => setReadings((list) => list.filter((r) => r.id !== id)),
       clearReadings: () => setReadings([]),
       updateSettings: (patch) => setSettings((s) => ({ ...s, ...patch })),
+      recordingInProgress,
+      setRecordingInProgress,
     };
-  }, [ready, storageError, venues, sessions, readings, settings]);
+  }, [ready, storageError, venues, sessions, readings, settings, recordingInProgress]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

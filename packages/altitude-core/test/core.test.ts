@@ -57,7 +57,9 @@ describe('floors', () => {
     expect(classifyFloor(0.4, floors)?.label).toBe('G');
     expect(classifyFloor(5.2, floors)?.label).toBe('1');
     expect(classifyFloor(-4.9, floors)?.label).toBe('B1');
-    expect(classifyFloor(40, floors)?.label).toBe('2');
+    expect(classifyFloor(11, floors)?.label).toBe('2'); // just above the top band
+    expect(classifyFloor(40, floors)).toBeNull(); // far beyond: drift, not "top floor"
+    expect(classifyFloor(-100, floors)).toBeNull();
     expect(classifyFloor(NaN, floors)).toBeNull();
   });
 
@@ -131,6 +133,41 @@ describe('CSV round trip', () => {
     expect(result.readings.length).toBeGreaterThan(0);
   });
 
+  it('rejects rows with the wrong number of cells', () => {
+    const csv = readingsToCsv(generateSampleReadings(3, 1));
+    const lines = csv.trimEnd().split('\r\n');
+    lines[1] = lines[1]!.split(',').slice(0, -1).join(',');
+    const result = csvToReadings(lines.join('\r\n'));
+    expect(result.errors[0]).toMatch(/Row 2: has/);
+  });
+
+  it('round-trips text starting with a tab and keeps leading spaces', () => {
+    const [r] = generateSampleReadings(5, 1) as [Reading];
+    const odd = { ...r, notes: '\t=cmd', venueName: '  Mall' };
+    const back = csvToReadings(readingsToCsv([odd])).readings[0]!;
+    expect(back.notes).toBe('\t=cmd');
+    expect(back.venueName).toBe('  Mall');
+  });
+
+  it('rejects hex and other non-decimal numbers', () => {
+    const csv = readingsToCsv(generateSampleReadings(6, 1));
+    const lines = csv.trimEnd().split('\r\n');
+    const cells = lines[1]!.split(',');
+    cells[7] = '0x1A'; // secondsSinceCalibration
+    lines[1] = cells.join(',');
+    expect(csvToReadings(lines.join('\r\n')).errors[0]).toMatch(/secondsSinceCalibration/);
+  });
+
+  it('still loads exports made before trueFloorHeightM existed', () => {
+    const csv = readingsToCsv(generateSampleReadings(7, 1));
+    const rows = csv.trimEnd().split('\r\n').map((l) => l.split(','));
+    const col = rows[0]!.indexOf('trueFloorHeightM');
+    const old = rows.map((r) => r.filter((_, i) => i !== col).join(',')).join('\r\n');
+    const result = csvToReadings(old);
+    expect(result.errors).toEqual([]);
+    expect(result.readings[0]!.trueFloorHeightM).toBeNull();
+  });
+
   it('reports missing columns', () => {
     expect(csvToReadings('a,b\r\n1,2').errors[0]).toMatch(/Missing columns/);
   });
@@ -164,6 +201,32 @@ describe('statistics and gate', () => {
     const big: Reading[] = [];
     while (big.length < 250_000) big.push(...readings);
     expect(summarize(big, 'baro', 4.5).maxAbsErrorM).toBeGreaterThan(0);
+  });
+
+  it('does not count a venue that has no readings for the evaluated source', () => {
+    // Reviewer probe: many readings in one venue + one GPS-only row elsewhere must not pass.
+    const cairo = readings.filter((r) => r.venueId === 'demo-cairo');
+    const extra = { ...readings.find((r) => r.venueId === 'demo-muscat')!, baroRelAltM: null, id: 'x1' };
+    const result = evaluateGate([...cairo, ...cairo.map((r) => ({ ...r, id: r.id + 'b' })), extra], 4.5, 'baro');
+    expect(result.verdict).toBe('insufficient-data');
+    expect(result.venues).toBe(1);
+  });
+
+  it('judges each reading against its own venue floor height', () => {
+    // The same 2.4 m error is within half of a 5 m floor but not of a 4 m floor.
+    const base = readings[0]!;
+    const a = { ...base, id: 'a', baroRelAltM: base.trueFloorCenterM + 2.4, trueFloorHeightM: 5 };
+    const b = { ...base, id: 'b', baroRelAltM: base.trueFloorCenterM + 2.4, trueFloorHeightM: 4 };
+    expect(summarize([a], 'baro', 4.5).withinHalfFloor).toBe(1);
+    expect(summarize([b], 'baro', 4.5).withinHalfFloor).toBe(0);
+    // Without a stored height the fallback is used.
+    expect(summarize([{ ...b, trueFloorHeightM: null }], 'baro', 6).withinHalfFloor).toBe(1);
+  });
+
+  it('gives the iOS altimeter a floor accuracy', () => {
+    const ios = summarize(readings, 'os', 4.5);
+    expect(ios.n).toBeGreaterThan(0);
+    expect(ios.floorAccuracy).not.toBeNull();
   });
 
   it('refuses a verdict on too little data', () => {

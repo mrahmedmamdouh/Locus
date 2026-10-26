@@ -76,6 +76,11 @@ export interface Reading {
   trueFloorIndex: number;
   /** Centre of the true floor's band, meters relative to entrance. */
   trueFloorCenterM: number;
+  /**
+   * Height of the true floor's band (zMaxM − zMinM) at capture time, so each
+   * reading is judged against its own venue's floors. Null in older exports.
+   */
+  trueFloorHeightM: number | null;
 
   /** Barometer. */
   pressureHpa: number | null;

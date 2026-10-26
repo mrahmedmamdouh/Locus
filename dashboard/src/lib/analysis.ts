@@ -4,7 +4,7 @@
  */
 import { driftByMinutes, evaluateGate, summarize, summarizeBy } from '@locus/altitude-core';
 import type { AccuracySummary, AltitudeSource, GateResult, Reading } from '@locus/altitude-core';
-import { isSyntheticRow, recalibrationAdvice, type DriftRow, type RecalibrationAdvice } from './data';
+import { countFallbackFloorHeight, isSyntheticRow, recalibrationAdvice, type DriftRow, type RecalibrationAdvice } from './data';
 import type { Settings } from './settings';
 
 export const SOURCES: readonly AltitudeSource[] = ['baro', 'gps', 'os'];
@@ -28,6 +28,8 @@ export interface Analysis {
   venues: number;
   devices: number;
   syntheticRows: number;
+  /** Readings without their own floor height, judged against the fallback floor height. */
+  fallbackFloorRows: number;
   gate: GateResult;
   bySource: AccuracySummary[];
   breakdowns: Record<BreakdownKey, BreakdownRow[]>;
@@ -75,6 +77,7 @@ export function analyze(readings: Reading[], settings: Settings): Analysis {
     venues: venueName.size,
     devices: new Set(readings.map((r) => r.deviceModel)).size,
     syntheticRows: readings.filter(isSyntheticRow).length,
+    fallbackFloorRows: countFallbackFloorHeight(readings),
     gate: evaluateGate(readings, floorHeightM, source, criteria),
     bySource: SOURCES.map((s) => summarize(readings, s, floorHeightM)),
     breakdowns: {

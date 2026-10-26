@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { AccuracySummary } from '@locus/altitude-core';
-import { fmtM, fmtPct } from '../lib/data';
+import { fmtFloors, fmtM, fmtPct } from '../lib/data';
 
 export function Card({
   title,
@@ -184,7 +184,10 @@ export function SummaryTable({
                 </th>
                 <td className="num">{fmtPct(s.floorAccuracy)}</td>
                 <td className="num">{fmtM(s.medianAbsErrorM)}</td>
-                <td className="num">{fmtM(s.p90AbsErrorM)}</td>
+                <td className="num">
+                  {fmtM(s.p90AbsErrorM)}
+                  <span className="muted small cell-sub">{fmtFloors(s.p90AbsErrorFloors)}</span>
+                </td>
                 <td className="num">{fmtPct(s.withinHalfFloor)}</td>
                 <td className="num">{fmtM(s.meanErrorM)}</td>
                 <td className="num">{s.n}</td>

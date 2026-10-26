@@ -10,7 +10,10 @@ export interface LocationApi {
   /** Whether the OS will ask again (false = must open Settings). */
   canAskAgain: boolean;
   requestPermission: () => Promise<LocationPermission>;
+  /** Latest fix for rendering (state; may lag behind inside async callbacks). */
   latest: GpsFix | null;
+  /** Latest fix right now, read from a ref (use this in async code such as after a recording window). */
+  getLatest: () => GpsFix | null;
   error: string | null;
   /** Resolve with the first fix newer than `sinceMs`, or null after `timeoutMs`. */
   waitForFix: (sinceMs: number, timeoutMs: number) => Promise<GpsFix | null>;
@@ -120,5 +123,7 @@ export function useLocationFix(opts: { demo: boolean; simHeightRef: MutableRefOb
     });
   }, []);
 
-  return { permission, canAskAgain, requestPermission, latest, error, waitForFix };
+  const getLatest = useCallback(() => latestRef.current, []);
+
+  return { permission, canAskAgain, requestPermission, latest, getLatest, error, waitForFix };
 }

@@ -3,7 +3,7 @@
  * filters, pagination and chart-shaping. All accuracy maths lives in
  * @locus/altitude-core; this module only arranges data around it.
  */
-import { altitudeFor, csvToReadings, driftByMinutes } from '@locus/altitude-core';
+import { altitudeFor, csvToReadings, driftByMinutes, floorHeightFor } from '@locus/altitude-core';
 import type { AltitudeSource, Reading } from '@locus/altitude-core';
 
 /* ------------------------------------------------------------------ */
@@ -137,40 +137,55 @@ export interface TableFilter {
 
 export const DEFAULT_TABLE_FILTER: TableFilter = { venue: '', device: '', correctness: 'all' };
 
-/**
- * Floor-estimate source used to mark a row correct/incorrect. The CSV only
- * carries floor estimates for barometer and GPS, so the iOS OS source falls
- * back to the barometer estimate.
- */
-export function estimateSourceFor(source: AltitudeSource): 'baro' | 'gps' {
-  return source === 'gps' ? 'gps' : 'baro';
-}
-
-export function estFloor(r: Reading, source: 'baro' | 'gps'): number | null {
+/** On-device floor estimate stored in the CSV (barometer and GPS only; the OS altimeter has none). */
+export function estFloor(r: Reading, source: AltitudeSource): number | null {
+  if (source === 'os') return null;
   const v = source === 'gps' ? r.estFloorIndexGps : r.estFloorIndexBaro;
   return v === null || !Number.isFinite(v) ? null : v;
 }
 
-/** true = estimate matched true floor, false = mismatch, null = no estimate. */
-export function isCorrect(r: Reading, source: 'baro' | 'gps'): boolean | null {
-  const est = estFloor(r, source);
-  return est === null ? null : est === r.trueFloorIndex;
+/**
+ * Whether a reading is on the correct floor for a source, matching the rule
+ * `summarize` uses for floor accuracy: barometer and GPS compare the stored
+ * on-device floor estimate; the iOS OS altimeter is correct when its |error|
+ * is below half of the reading's own floor height (`floorHeightFor`, falling
+ * back to `fallbackFloorM`). null = no estimate / no value.
+ */
+export function isCorrect(r: Reading, source: AltitudeSource, fallbackFloorM: number): boolean | null {
+  if (source !== 'os') {
+    const est = estFloor(r, source);
+    return est === null ? null : est === r.trueFloorIndex;
+  }
+  const alt = altitudeFor(r, source);
+  return alt === null ? null : Math.abs(alt - r.trueFloorCenterM) < floorHeightFor(r, fallbackFloorM) / 2;
 }
 
 export function filterReadings(
   readings: readonly Reading[],
   filter: TableFilter,
-  source: 'baro' | 'gps',
+  source: AltitudeSource,
+  fallbackFloorM: number,
 ): Reading[] {
   return readings.filter((r) => {
     if (filter.venue && r.venueId !== filter.venue) return false;
     if (filter.device && r.deviceModel !== filter.device) return false;
     if (filter.correctness === 'all') return true;
-    const c = isCorrect(r, source);
+    const c = isCorrect(r, source, fallbackFloorM);
     if (filter.correctness === 'correct') return c === true;
     if (filter.correctness === 'incorrect') return c === false;
     return c === null;
   });
+}
+
+/**
+ * Readings judged against the fallback floor height because they carry no
+ * usable `trueFloorHeightM` (CSVs from older app builds). Delegates the
+ * "usable height" rule to `floorHeightFor` (a NaN fallback comes back as NaN).
+ */
+export function countFallbackFloorHeight(readings: readonly Reading[]): number {
+  let n = 0;
+  for (const r of readings) if (Number.isNaN(floorHeightFor(r, Number.NaN))) n++;
+  return n;
 }
 
 /** Distinct venues (id + display name), sorted by name. */
@@ -288,6 +303,11 @@ export function fmtPct(x: number | null | undefined, dp = 1): string {
 
 export function fmtM(x: number | null | undefined, dp = 2): string {
   return x === null || x === undefined || !Number.isFinite(x) ? '—' : `${x.toFixed(dp)} m`;
+}
+
+/** Error expressed in floors, e.g. "0.27 floors". */
+export function fmtFloors(x: number | null | undefined, dp = 2): string {
+  return x === null || x === undefined || !Number.isFinite(x) ? '—' : `${x.toFixed(dp)} floors`;
 }
 
 export function fmtNum(x: number | null | undefined, dp = 2): string {

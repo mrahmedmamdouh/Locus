@@ -6,7 +6,6 @@ import {
   SOURCE_LABEL,
   distinctSorted,
   estFloor,
-  estimateSourceFor,
   exportFileName,
   filterReadings,
   fmtNum,
@@ -45,15 +44,26 @@ function CorrectCell({ value }: { value: boolean | null }) {
   );
 }
 
-export function ReadingsTable({ readings, source }: { readings: Reading[]; source: AltitudeSource }) {
+export function ReadingsTable({
+  readings,
+  source,
+  floorHeightM,
+}: {
+  readings: Reading[];
+  source: AltitudeSource;
+  /** Fallback floor height for rows without their own (used by the iOS OS correctness rule). */
+  floorHeightM: number;
+}) {
   const ids = { venue: useId(), device: useId(), correct: useId() };
   const [filter, setFilter] = useState<TableFilter>(DEFAULT_TABLE_FILTER);
   const [page, setPage] = useState(0);
-  const estSource = estimateSourceFor(source);
 
   const venues = useMemo(() => venueOptions(readings), [readings]);
   const devices = useMemo(() => distinctSorted(readings, (r) => r.deviceModel), [readings]);
-  const filtered = useMemo(() => filterReadings(readings, filter, estSource), [readings, filter, estSource]);
+  const filtered = useMemo(
+    () => filterReadings(readings, filter, source, floorHeightM),
+    [readings, filter, source, floorHeightM],
+  );
   const pg = paginate(filtered, page, PAGE_SIZE);
 
   useEffect(() => setPage(0), [filter, readings]);
@@ -67,7 +77,11 @@ export function ReadingsTable({ readings, source }: { readings: Reading[]; sourc
   return (
     <Card
       title="Readings"
-      subtitle={`Correct / wrong uses the on-device ${SOURCE_LABEL[estSource].toLowerCase()} floor estimate${source === 'os' ? ' (no OS floor estimate exists)' : ''}.`}
+      subtitle={
+        source === 'os'
+          ? 'Correct / wrong: iOS OS altitude within half of the true floor’s height (fallback height for older files).'
+          : `Correct / wrong uses the on-device ${SOURCE_LABEL[source].toLowerCase()} floor estimate.`
+      }
     >
       <div className="toolbar">
         <div className="field">
@@ -160,9 +174,9 @@ export function ReadingsTable({ readings, source }: { readings: Reading[]; sourc
                     <td className="num">{fmtNum(r.trueFloorCenterM, 1)}</td>
                     <td className="num">{fmtNum(alt)}</td>
                     <td className="num">{alt === null ? '—' : fmtNum(alt - r.trueFloorCenterM)}</td>
-                    <td className="num">{estFloor(r, estSource) ?? '—'}</td>
+                    <td className="num">{estFloor(r, source) ?? '—'}</td>
                     <td>
-                      <CorrectCell value={isCorrect(r, estSource)} />
+                      <CorrectCell value={isCorrect(r, source, floorHeightM)} />
                     </td>
                     <td className="num">{fmtNum(r.secondsSinceCalibration / 60, 1)}</td>
                     <td title={r.notes} style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
