@@ -12,7 +12,7 @@ An iPhone only installs apps signed with an Apple Developer account, so iOS buil
 
 ## One-time setup (about 30 minutes once Apple approves your membership)
 
-1. **Create the app in App Store Connect.** In [App Store Connect](https://appstoreconnect.apple.com) → Apps → **+** → New App: platform iOS, name "Locus Altitude Test", bundle ID `com.locus.altitudetest` (register it under Certificates, Identifiers & Profiles → Identifiers if it is not in the list), SKU `locus-altitude-test`. If Apple says the bundle ID is taken, pick another (for example `com.<yourname>.locus`), and change `ios.bundleIdentifier` in `app/app.json` to match.
+1. **Create the app in App Store Connect.** In [App Store Connect](https://appstoreconnect.apple.com) → Apps → **+** → New App: platform iOS, name "Locus Field", bundle ID `com.locus.field` (register it under Certificates, Identifiers & Profiles → Identifiers if it is not in the list), SKU `locus-field`. If Apple says the bundle ID is taken, pick another (for example `com.<yourname>.locus`), and change `ios.bundleIdentifier` in `app/app.json` to match.
 2. **Get the code and install:**
    ```bash
    git clone https://github.com/mrahmedmamdouh/Locus.git

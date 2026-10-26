@@ -62,7 +62,7 @@ jobs:
         id: apk
         run: |
           version=$(node -p "require('./app/app.json').expo.version")
-          name="locus-altitude-test-${version}-build${GITHUB_RUN_NUMBER}.apk"
+          name="locus-field-${version}-build${GITHUB_RUN_NUMBER}.apk"
           cp app/android/app/build/outputs/apk/release/app-release.apk "$name"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -85,8 +85,8 @@ jobs:
           gh release create "$tag" "$APK" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Locus Altitude Test ${VERSION} (Android build ${GITHUB_RUN_NUMBER})" \
-            --notes "Android APK of the Locus altitude field-test app, built from ${GITHUB_SHA}.
+            --title "Locus Field ${VERSION} (Android build ${GITHUB_RUN_NUMBER})" \
+            --notes "Android APK of Locus Field, the altitude field-test app, built from ${GITHUB_SHA}.
 
           Install: open this page on the Android phone, download the APK, and allow installs from this source when asked.
           Signed with the Android debug keystore: for internal field testing only, not for Google Play."

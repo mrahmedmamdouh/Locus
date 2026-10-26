@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Locus Altitude Test",
-    "slug": "locus-altitude-test",
+    "name": "Locus Field",
+    "slug": "locus-field",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.locus.altitudetest",
+      "bundleIdentifier": "com.locus.field",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Locus compares GPS altitude with the barometer to test whether your phone can tell which mall floor you are on. Location is used only while the app is open and is saved only on this phone.",
         "NSMotionUsageDescription": "Locus reads the barometer (altimeter) to measure height changes between mall floors. Readings stay on this phone."
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "package": "com.locus.altitudetest",
+      "package": "com.locus.field",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"

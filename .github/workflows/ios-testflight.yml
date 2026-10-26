@@ -5,7 +5,7 @@ name: iOS build to TestFlight
 #
 # ONE-TIME SETUP (see docs/ios-testflight.md):
 #   1. Apple Developer Program membership and an app record in App Store Connect
-#      for bundle id com.locus.altitudetest.
+#      for bundle id com.locus.field.
 #   2. From any computer (no Mac needed), in app/:
 #        npx eas-cli@26.0.0 login
 #        npx eas-cli@26.0.0 init            # writes extra.eas.projectId into app.json; commit it
