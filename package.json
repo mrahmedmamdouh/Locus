@@ -1,0 +1,21 @@
+{
+  "name": "locus",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Locus MVP: field test of phone altitude (barometer + GPS) for 3D geofenced offers in malls",
+  "workspaces": [
+    "packages/*",
+    "app",
+    "dashboard"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace packages/altitude-core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dashboard:dev": "npm run dev --workspace dashboard",
+    "dashboard:build": "npm run build --workspace dashboard",
+    "app:start": "npm run start --workspace app"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
