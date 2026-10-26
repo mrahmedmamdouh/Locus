@@ -70,7 +70,13 @@ const REQUIRED_NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'sampleCount',
 ]);
 
-function escapeCell(value: unknown): string {
+/** Undo the formula-escaping quote added by `escapeCsvCell` to a text cell. */
+export function unescapeCsvText(cell: string): string {
+  return cell.startsWith("'") && FORMULA_START.test(cell.slice(1)) ? cell.slice(1) : cell;
+}
+
+/** Escape one CSV cell (RFC 4180) and neutralise spreadsheet formula injection. */
+export function escapeCsvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   let s = typeof value === 'number' ? (Number.isFinite(value) ? String(value) : '') : String(value);
   // Neutralise spreadsheet formula injection (CSV opened in Excel/Sheets).
@@ -82,7 +88,7 @@ function escapeCell(value: unknown): string {
 export function readingsToCsv(readings: Reading[]): string {
   const lines = [READING_COLUMNS.join(',')];
   for (const r of readings) {
-    lines.push(READING_COLUMNS.map((c) => escapeCell(r[c])).join(','));
+    lines.push(READING_COLUMNS.map((c) => escapeCsvCell(r[c])).join(','));
   }
   return lines.join('\r\n') + '\r\n';
 }
@@ -168,7 +174,7 @@ export function csvToReadings(text: string): ParseResult {
         }
       } else {
         // Text is kept as written (no trimming); undo the formula-escaping quote.
-        out[col] = cell.startsWith("'") && FORMULA_START.test(cell.slice(1)) ? cell.slice(1) : cell;
+        out[col] = unescapeCsvText(cell);
       }
     }
     const bad = READING_COLUMNS.filter(

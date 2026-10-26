@@ -6,3 +6,4 @@ export * from './smoothing';
 export * from './csv';
 export * from './stats';
 export * from './sample';
+export * from './device';
