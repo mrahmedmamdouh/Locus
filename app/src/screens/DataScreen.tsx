@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { summarize, typicalFloorHeightM, type AccuracySummary, type Reading } from '@locus/altitude-core';
+import { summarize, typicalFloorHeightM, type AccuracySummary, type DeviceCheck, type Reading } from '@locus/altitude-core';
 import { useAppState } from '../state/AppState';
-import { exportReadingsCsv } from '../logic/export';
+import { exportDeviceChecksCsv, exportReadingsCsv } from '../logic/export';
+import { deviceCheckVerdict } from '../logic/deviceCheck';
 import { DEFAULT_FLOOR_HEIGHT_M } from '../logic/venueDraft';
 import { fmt, fmtPct, fmtSigned } from '../logic/numbers';
 import { Banner, Button, Card, Chip, H1, H2, Muted, Row } from '../ui/kit';
@@ -12,7 +13,7 @@ import { confirm, notify } from '../ui/confirm';
 type Scope = 'session' | 'all';
 
 export function DataScreen() {
-  const { readings, activeSession, venues, deleteReading, clearReadings } = useAppState();
+  const { readings, activeSession, venues, deleteReading, clearReadings, deviceChecks, deleteDeviceCheck } = useAppState();
   const [scope, setScope] = useState<Scope>(activeSession ? 'session' : 'all');
   const [busy, setBusy] = useState(false);
 
@@ -61,6 +62,31 @@ export function DataScreen() {
       setBusy(false);
     }
   };
+
+  const doExportChecks = async () => {
+    if (deviceChecks.length === 0) {
+      notify('Nothing to export', 'No device checks yet. Run one in Settings.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await exportDeviceChecksCsv(deviceChecks);
+    } catch (e) {
+      notify('Export failed', e instanceof Error ? e.message : 'Unknown error.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDeleteCheck = async (c: DeviceCheck) => {
+    const ok = await confirm('Delete device check?', `${c.deviceModel} at ${new Date(c.timestamp).toLocaleString()}`, 'Delete', true);
+    if (ok) deleteDeviceCheck(c.id);
+  };
+
+  const checksNewestFirst = useMemo(
+    () => deviceChecks.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+    [deviceChecks],
+  );
 
   const onClear = async () => {
     const ok = await confirm(
@@ -125,6 +151,24 @@ export function DataScreen() {
           busy={busy}
           disabled={readings.length === 0}
         />
+        <View style={{ height: space.sm }} />
+        <Button
+          title={`Export device checks (${deviceChecks.length})`}
+          variant="secondary"
+          onPress={() => void doExportChecks()}
+          busy={busy}
+          disabled={deviceChecks.length === 0}
+        />
+        <View style={{ height: space.sm }} />
+        <Muted>Readings and device checks are separate files; share both with the team.</Muted>
+      </Card>
+
+      <Card>
+        <H2>Device checks ({deviceChecks.length})</H2>
+        {deviceChecks.length === 0 ? <Muted>No device checks yet. Run one in Settings (takes ~8 s).</Muted> : null}
+        {checksNewestFirst.map((c) => (
+          <DeviceCheckRow key={c.id} c={c} onDelete={() => void onDeleteCheck(c)} />
+        ))}
       </Card>
 
       {list.length > 0 ? <H2>Readings (newest first)</H2> : null}
@@ -150,6 +194,28 @@ function SummaryLine({ name, s }: { name: string; s: AccuracySummary }) {
       {name}: <Text style={{ fontWeight: '700' }}>{fmtPct(s.floorAccuracy)}</Text> correct floor (n={s.n}) · median |err|{' '}
       {fmt(s.medianAbsErrorM, 2, 'm')} · p90 {fmt(s.p90AbsErrorM, 2, 'm')} · within ½ floor {fmtPct(s.withinHalfFloor)}
     </Text>
+  );
+}
+
+function DeviceCheckRow({ c, onDelete }: { c: DeviceCheck; onDelete: () => void }) {
+  const v = deviceCheckVerdict(c);
+  return (
+    <View style={[st.row, { borderLeftColor: v.canRunBarometerTest ? colors.good : colors.warn, backgroundColor: colors.bg }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={st.rowTitle}>
+          {c.deviceModel} · {v.barometer}
+        </Text>
+        <Muted>
+          {v.gps} · {v.conclusion}
+          {'\n'}
+          {new Date(c.timestamp).toLocaleString()} · {c.platform} {c.osVersion}
+          {c.notes ? ` · ${c.notes}` : ''}
+        </Muted>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Delete device check" onPress={onDelete} style={st.del} hitSlop={8}>
+        <Text style={{ color: colors.bad, fontWeight: '600' }}>Delete</Text>
+      </Pressable>
+    </View>
   );
 }
 

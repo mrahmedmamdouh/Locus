@@ -3,16 +3,18 @@ import * as Device from 'expo-device';
 import { useAppState } from '../state/AppState';
 import { deviceModelLabel } from '../logic/device';
 import { useSensors } from '../state/SensorContext';
+import { DeviceCheckCard } from './DeviceCheckCard';
 import { Body, Card, H1, H2, Muted } from '../ui/kit';
 import { colors, space } from '../ui/theme';
 
 export function SettingsScreen() {
-  const { settings, updateSettings, readings, sessions } = useAppState();
+  const { settings, updateSettings, readings, sessions, deviceChecks } = useAppState();
   const { baro, location } = useSensors();
   const hw = baro.hardwareAvailable === null ? 'checking…' : baro.hardwareAvailable ? 'yes' : 'no';
   return (
     <ScrollView contentContainerStyle={{ padding: space.lg }}>
       <H1>Settings</H1>
+      <DeviceCheckCard />
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
           <View style={{ flex: 1 }}>
@@ -37,7 +39,7 @@ export function SettingsScreen() {
         <Body>Barometer hardware: {hw}</Body>
         {baro.permissionDenied ? <Body>Motion &amp; Fitness permission: denied (barometer unusable)</Body> : null}
         <Body>Location permission: {location.permission}</Body>
-        <Body>Stored: {sessions.length} session(s), {readings.length} reading(s)</Body>
+        <Body>Stored: {sessions.length} session(s), {readings.length} reading(s), {deviceChecks.length} device check(s)</Body>
       </Card>
       <Card>
         <H2>How to test</H2>

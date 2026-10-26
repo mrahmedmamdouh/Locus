@@ -1,13 +1,15 @@
 import { Linking, View } from 'react-native';
 import { useSensors } from '../state/SensorContext';
 import { useAppState } from '../state/AppState';
+import { useGoTo } from '../state/Nav';
 import { Banner, Body, Button, Card, H2, Muted } from '../ui/kit';
 import { space } from '../ui/theme';
 
 /** Hardware + permission status, with the location rationale and a way to grant it. */
 export function SensorBanners() {
   const { baro, location } = useSensors();
-  const { settings } = useAppState();
+  const { settings, deviceChecks } = useAppState();
+  const goTo = useGoTo();
   const demo = settings.demoMode;
 
   return (
@@ -18,10 +20,14 @@ export function SensorBanners() {
         </Banner>
       ) : null}
       {!demo && baro.status === 'unavailable' ? (
-        <Banner tone="bad">
-          This phone has no barometer, so it cannot take part in the barometer test. You can still record GPS-only readings
-          (barometer columns will be empty).
-        </Banner>
+        <View>
+          <Banner tone="bad">
+            This phone has no barometer — it can only record GPS readings. Run a device check so it still counts in sensor coverage.
+          </Banner>
+          {deviceChecks.length === 0 ? (
+            <Button title="Run device check" variant="secondary" onPress={() => goTo('settings')} style={{ marginBottom: space.md }} />
+          ) : null}
+        </View>
       ) : null}
       {!demo && baro.status === 'permission-denied' ? (
         <Card>

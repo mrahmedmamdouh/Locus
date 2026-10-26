@@ -16,3 +16,8 @@ export function slugify(text: string): string {
 export function csvFileName(venueOrAll: string, date: Date): string {
   return `locus-readings-${slugify(venueOrAll)}-${localDateStamp(date)}.csv`;
 }
+
+/** locus-device-checks-<YYYY-MM-DD>.csv */
+export function deviceChecksFileName(date: Date): string {
+  return `locus-device-checks-${localDateStamp(date)}.csv`;
+}

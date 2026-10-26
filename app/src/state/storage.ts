@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Reading, Venue } from '@locus/altitude-core';
+import type { DeviceCheck, Reading, Venue } from '@locus/altitude-core';
 import type { Session } from '../logic/types';
 
 /**
@@ -18,6 +18,8 @@ export const KEYS = {
   readingIndex: 'locus.v2.readingSessions',
   readingPrefix: 'locus.v2.readings:',
   settings: 'locus.v1.settings',
+  /** Device capability checks (small list, one value). */
+  deviceChecks: 'locus.v1.deviceChecks',
 } as const;
 
 export const readingKey = (sessionId: string) => `${KEYS.readingPrefix}${sessionId}`;
@@ -35,12 +37,15 @@ export interface Settings {
   demoMode: boolean;
   activeSessionId: string | null;
   defaultTemperatureC: number;
+  /** The first-launch "run a device check" prompt was dismissed or acted on. */
+  deviceCheckPromptDone: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   demoMode: false,
   activeSessionId: null,
   defaultTemperatureC: 24,
+  deviceCheckPromptDone: false,
 };
 
 export interface PersistedState {
@@ -48,10 +53,13 @@ export interface PersistedState {
   sessions: Session[];
   readings: Reading[];
   settings: Settings;
+  deviceChecks: DeviceCheck[];
 }
 
 const isArray = <T,>(v: unknown): v is T[] => Array.isArray(v);
 const isObject = (v: unknown): v is Partial<Settings> => typeof v === 'object' && v !== null;
+const isDeviceCheckArray = (v: unknown): v is DeviceCheck[] =>
+  Array.isArray(v) && v.every((x) => typeof x === 'object' && x !== null && typeof (x as DeviceCheck).id === 'string');
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
 
 /** Readings saved before `trueFloorHeightM` existed get null (not undefined). */
@@ -179,13 +187,14 @@ export function createStorage(kv: KeyValueStore) {
 
   return {
     async loadAll(): Promise<PersistedState> {
-      const [venues, sessions, readings, settings] = await Promise.all([
+      const [venues, sessions, readings, settings, deviceChecks] = await Promise.all([
         readJson<Venue[]>(KEYS.venues, [], isArray),
         readJson<Session[]>(KEYS.sessions, [], isArray),
         loadReadings(),
         readJson<Partial<Settings>>(KEYS.settings, {}, isObject),
+        readJson<DeviceCheck[]>(KEYS.deviceChecks, [], isDeviceCheckArray),
       ]);
-      return { venues, sessions, readings, settings: { ...DEFAULT_SETTINGS, ...settings } };
+      return { venues, sessions, readings, settings: { ...DEFAULT_SETTINGS, ...settings }, deviceChecks };
     },
     saveVenues: (v: Venue[]) => kv.setItem(KEYS.venues, JSON.stringify(v)),
     saveSessions: (s: Session[]) => kv.setItem(KEYS.sessions, JSON.stringify(s)),
@@ -199,8 +208,10 @@ export function createStorage(kv: KeyValueStore) {
       return run;
     },
     saveSettings: (s: Settings) => kv.setItem(KEYS.settings, JSON.stringify(s)),
+    /** Persist the full device-check list. Call only after loadAll() succeeded. */
+    saveDeviceChecks: (c: DeviceCheck[]) => kv.setItem(KEYS.deviceChecks, JSON.stringify(c)),
   };
 }
 
 const appStorage = createStorage(AsyncStorage);
-export const { loadAll, saveVenues, saveSessions, saveReadings, saveSettings } = appStorage;
+export const { loadAll, saveVenues, saveSessions, saveReadings, saveSettings, saveDeviceChecks } = appStorage;

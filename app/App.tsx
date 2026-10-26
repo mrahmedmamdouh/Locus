@@ -8,10 +8,10 @@ import { TestScreen } from './src/screens/TestScreen';
 import { VenuesScreen } from './src/screens/VenuesScreen';
 import { DataScreen } from './src/screens/DataScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
-import { Banner } from './src/ui/kit';
+import { Banner, Body, Button, Card, H2 } from './src/ui/kit';
+import { NavContext, type Tab } from './src/state/Nav';
 import { colors, space } from './src/ui/theme';
 
-type Tab = 'test' | 'venues' | 'data' | 'settings';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'test', label: 'Test' },
   { key: 'venues', label: 'Venues' },
@@ -30,7 +30,7 @@ export default function App() {
 }
 
 function Root() {
-  const { ready, settings, storageError, venues, recordingInProgress } = useAppState();
+  const { ready, settings, storageError, venues, recordingInProgress, deviceChecks, updateSettings } = useAppState();
   const [tab, setTab] = useState<Tab | null>(null);
   if (!ready) {
     return (
@@ -40,13 +40,34 @@ function Root() {
     );
   }
   const current: Tab = tab ?? (venues.length === 0 ? 'venues' : 'test');
+  const goTo = (t: Tab) => {
+    if (!recordingInProgress) setTab(t);
+  };
+  // First launch: ask the tester to run a device check before anything else.
+  const showCheckPrompt = !settings.deviceCheckPromptDone && deviceChecks.length === 0 && current !== 'settings';
   return (
+    <NavContext.Provider value={goTo}>
     <SensorProvider demo={settings.demoMode}>
       <SafeAreaView style={st.fill} edges={['top', 'left', 'right']}>
         <StatusBar style="dark" />
         {storageError ? (
           <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
             <Banner tone="bad">{storageError}</Banner>
+          </View>
+        ) : null}
+        {showCheckPrompt ? (
+          <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
+            <Card>
+              <H2>First: run a device check</H2>
+              <Body>
+                It takes about 8 seconds and records which altitude sensors this phone has, so it counts in sensor coverage even if
+                it has no barometer.
+              </Body>
+              <View style={{ height: space.md }} />
+              <Button title="Run device check" onPress={() => goTo('settings')} />
+              <View style={{ height: space.sm }} />
+              <Button title="Not now" variant="secondary" onPress={() => updateSettings({ deviceCheckPromptDone: true })} />
+            </Card>
           </View>
         ) : null}
         <View style={st.fill}>
@@ -80,6 +101,7 @@ function Root() {
         </View>
       </SafeAreaView>
     </SensorProvider>
+    </NavContext.Provider>
   );
 }
 

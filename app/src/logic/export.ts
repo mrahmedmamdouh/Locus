@@ -1,16 +1,26 @@
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { readingsToCsv, type Reading } from '@locus/altitude-core';
-import { csvFileName } from './exportName';
+import { deviceChecksToCsv, readingsToCsv, type DeviceCheck, type Reading } from '@locus/altitude-core';
+import { csvFileName, deviceChecksFileName } from './exportName';
 
 /**
  * Write readings to a CSV in the cache directory and open the share sheet.
  * Returns the file name. On web it triggers a browser download instead.
  */
 export async function exportReadingsCsv(readings: Reading[], label: string): Promise<string> {
-  const csv = readingsToCsv(readings);
-  const name = csvFileName(label, new Date());
+  return shareCsv(readingsToCsv(readings), csvFileName(label, new Date()), 'Export Locus readings');
+}
+
+/**
+ * Device checks go in their own file (different header). expo-sharing shares one file per
+ * call, so this is a separate export rather than part of "Export all".
+ */
+export async function exportDeviceChecksCsv(checks: DeviceCheck[]): Promise<string> {
+  return shareCsv(deviceChecksToCsv(checks), deviceChecksFileName(new Date()), 'Export Locus device checks');
+}
+
+async function shareCsv(csv: string, name: string, dialogTitle: string): Promise<string> {
   if (Platform.OS === 'web') {
     downloadOnWeb(csv, name);
     return name;
@@ -25,7 +35,7 @@ export async function exportReadingsCsv(readings: Reading[], label: string): Pro
   await Sharing.shareAsync(file.uri, {
     mimeType: 'text/csv',
     UTI: 'public.comma-separated-values-text',
-    dialogTitle: 'Export Locus readings',
+    dialogTitle,
   });
   return name;
 }
