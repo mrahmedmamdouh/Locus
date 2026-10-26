@@ -1,0 +1,91 @@
+name: Build Android APK
+
+# Builds an installable APK of the field-test app on a free GitHub runner and
+# publishes it as a GitHub Release asset (stable download link for testers).
+#
+# The APK is signed with the default Android DEBUG keystore that Expo prebuild
+# sets up. That is fine for sideloading to test phones; it is NOT for Google Play.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['app-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # create the GitHub Release
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Set up Java 17 (required by React Native 0.88 Gradle toolchain)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project
+        working-directory: app
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        working-directory: app/android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Name the APK
+        id: apk
+        run: |
+          version=$(node -p "require('./app/app.json').expo.version")
+          name="locus-altitude-test-${version}-build${GITHUB_RUN_NUMBER}.apk"
+          cp app/android/app/build/outputs/apk/release/app-release.apk "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          ls -la "$name"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: ${{ steps.apk.outputs.name }}
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.apk.outputs.name }}
+          VERSION: ${{ steps.apk.outputs.version }}
+        run: |
+          tag="app-v${VERSION}-build${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" "$APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Locus Altitude Test ${VERSION} (Android build ${GITHUB_RUN_NUMBER})" \
+            --notes "Android APK of the Locus altitude field-test app, built from ${GITHUB_SHA}.
+
+          Install: open this page on the Android phone, download the APK, and allow installs from this source when asked.
+          Signed with the Android debug keystore: for internal field testing only, not for Google Play."
