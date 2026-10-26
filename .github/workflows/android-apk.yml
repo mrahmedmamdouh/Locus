@@ -41,7 +41,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+          # No `cache: gradle` here: the Gradle files only exist after
+          # `expo prebuild`, and setup-java fails if it finds none to hash.
 
       - name: Install dependencies
         run: npm ci
