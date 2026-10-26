@@ -17,11 +17,17 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Locus compares GPS altitude with the barometer to test whether your phone can tell which mall floor you are on. Location is used only while the app is open and is saved only on this phone.",
         "NSMotionUsageDescription": "Locus reads the barometer (altimeter) to measure height changes between mall floors. Readings stay on this phone."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.locus.altitudetest",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

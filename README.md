@@ -54,6 +54,11 @@ npx expo start --tunnel
 
 Scan the QR code with the camera (iPhone) or Expo Go (Android). `--tunnel` works even when the phone and laptop are on different networks, which is the normal case in a mall. Before going out, read the [field-test protocol](docs/field-test-protocol.md).
 
+## Installing the app on phones
+
+- **Android:** download the APK from the [latest release](https://github.com/mrahmedmamdouh/Locus/releases/latest). It is built by the *Build Android APK* workflow (Actions → Run workflow) and signed with a debug key, for internal testing only.
+- **iPhone:** via TestFlight. One-time setup and steps are in [docs/ios-testflight.md](docs/ios-testflight.md).
+
 ## Deployment
 
 | What | How | Cost |

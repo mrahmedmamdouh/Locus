@@ -1,0 +1,73 @@
+name: iOS build to TestFlight
+
+# Builds the field-test app for iOS on EAS Build (Expo's cloud macOS builders)
+# and submits it to TestFlight.
+#
+# ONE-TIME SETUP (see docs/ios-testflight.md):
+#   1. Apple Developer Program membership and an app record in App Store Connect
+#      for bundle id com.locus.altitudetest.
+#   2. From any computer (no Mac needed), in app/:
+#        npx eas-cli@26.0.0 login
+#        npx eas-cli@26.0.0 init            # writes extra.eas.projectId into app.json; commit it
+#        npx eas-cli@26.0.0 build -p ios --profile production --auto-submit
+#      This first run asks for your Apple login, creates the signing certificate
+#      and provisioning profile, and stores an App Store Connect API key on EAS.
+#   3. Add a repository secret EXPO_TOKEN (expo.dev -> Account settings -> Access tokens).
+# After that, every run of this workflow builds and submits without prompts.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Build and submit to TestFlight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check setup
+        id: check
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::EXPO_TOKEN secret is not set. Follow docs/ios-testflight.md, then re-run."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.check.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Check the app is linked to an EAS project
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          if ! node -e "process.exit(require('./app/app.json').expo?.extra?.eas?.projectId ? 0 : 1)"; then
+            echo "::error::app/app.json has no extra.eas.projectId. Run 'npx eas-cli init' in app/ once and commit the result (docs/ios-testflight.md)."
+            exit 1
+          fi
+
+      - name: Build on EAS and submit to TestFlight
+        if: steps.check.outputs.ready == 'true'
+        working-directory: app
+        run: npx eas-cli@26.0.0 build --platform ios --profile production --non-interactive --auto-submit --no-wait
