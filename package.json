@@ -9,10 +9,11 @@
     "dashboard"
   ],
   "scripts": {
-    "test": "npm run test --workspace packages/altitude-core",
+    "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dashboard:dev": "npm run dev --workspace dashboard",
     "dashboard:build": "npm run build --workspace dashboard",
+    "dashboard:preview": "npm run preview --workspace dashboard",
     "app:start": "npm run start --workspace app"
   },
   "engines": {

@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Locus Altitude Test",
+    "slug": "locus-altitude-test",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.locus.altitudetest",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Locus compares GPS altitude with the barometer to test whether your phone can tell which mall floor you are on. Location is used only while the app is open and is saved only on this phone.",
+        "NSMotionUsageDescription": "Locus reads the barometer (altimeter) to measure height changes between mall floors. Readings stay on this phone."
+      }
+    },
+    "android": {
+      "package": "com.locus.altitudetest",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Locus compares GPS altitude with the barometer to test whether your phone can tell which mall floor you are on. Location is used only while the app is open and is saved only on this phone."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Locus reads the barometer (altimeter) to measure height changes between mall floors. Readings stay on this phone."
+        }
+      ],
+      "expo-sharing"
+    ]
+  }
+}

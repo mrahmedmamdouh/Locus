@@ -1,0 +1,307 @@
+/**
+ * Dashboard-specific pure logic: loading/merging files, row exclusion, table
+ * filters, pagination and chart-shaping. All accuracy maths lives in
+ * @locus/altitude-core; this module only arranges data around it.
+ */
+import { altitudeFor, csvToReadings, driftByMinutes } from '@locus/altitude-core';
+import type { AltitudeSource, Reading } from '@locus/altitude-core';
+
+/* ------------------------------------------------------------------ */
+/* Loading and merging                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface FileReport {
+  /** Display name of the file (or "Synthetic sample"). */
+  name: string;
+  /** Rows parsed successfully. */
+  parsed: number;
+  /** Parsed rows actually added (not duplicates of an already-loaded id). */
+  added: number;
+  /** Parsed rows skipped because their id was already loaded. */
+  duplicates: number;
+  /** Parse problems reported by csvToReadings (rows skipped). */
+  errors: string[];
+  /** True for generated demo data. */
+  synthetic: boolean;
+}
+
+export interface Dataset {
+  readings: Reading[];
+  files: FileReport[];
+}
+
+export const EMPTY_DATASET: Dataset = { readings: [], files: [] };
+
+/**
+ * Merge new readings into an existing list, de-duplicating by reading id.
+ * The first occurrence of an id wins, so re-uploading a file is a no-op.
+ * Rows with an empty id cannot be de-duplicated and are always kept.
+ */
+export function mergeReadings(
+  existing: readonly Reading[],
+  incoming: readonly Reading[],
+): { readings: Reading[]; added: number; duplicates: number } {
+  const seen = new Set<string>();
+  for (const r of existing) if (r.id) seen.add(r.id);
+  const readings = existing.slice();
+  let added = 0;
+  let duplicates = 0;
+  for (const r of incoming) {
+    if (r.id) {
+      if (seen.has(r.id)) {
+        duplicates++;
+        continue;
+      }
+      seen.add(r.id);
+    }
+    readings.push(r);
+    added++;
+  }
+  return { readings, added, duplicates };
+}
+
+/** Add one parsed source (a CSV file or the synthetic sample) to a dataset. */
+export function addSource(
+  dataset: Dataset,
+  name: string,
+  incoming: readonly Reading[],
+  errors: readonly string[],
+  synthetic = false,
+): Dataset {
+  const merged = mergeReadings(dataset.readings, incoming);
+  return {
+    readings: merged.readings,
+    files: [
+      ...dataset.files,
+      {
+        name,
+        parsed: incoming.length,
+        added: merged.added,
+        duplicates: merged.duplicates,
+        errors: [...errors],
+        synthetic,
+      },
+    ],
+  };
+}
+
+/** Parse CSV text and add it to a dataset. Never throws: problems land in the file report. */
+export function addCsvText(dataset: Dataset, name: string, text: string): Dataset {
+  let result: { readings: Reading[]; errors: string[] };
+  try {
+    result = csvToReadings(text);
+  } catch (err) {
+    result = { readings: [], errors: [`Could not parse file: ${err instanceof Error ? err.message : String(err)}`] };
+  }
+  return addSource(dataset, name, result.readings, result.errors);
+}
+
+/* ------------------------------------------------------------------ */
+/* Row exclusion (DEMO / synthetic notes)                              */
+/* ------------------------------------------------------------------ */
+
+export interface ExclusionOptions {
+  /** Exclude rows whose notes start with "DEMO" (app demo mode). */
+  excludeDemo: boolean;
+  /** Exclude rows whose notes equal "synthetic" (generated sample data). */
+  excludeSynthetic: boolean;
+}
+
+export const DEFAULT_EXCLUSION: ExclusionOptions = { excludeDemo: true, excludeSynthetic: false };
+
+export function isDemoRow(r: Reading): boolean {
+  return (r.notes ?? '').trim().startsWith('DEMO');
+}
+
+export function isSyntheticRow(r: Reading): boolean {
+  return (r.notes ?? '').trim().toLowerCase() === 'synthetic';
+}
+
+export function applyExclusions(readings: readonly Reading[], opts: ExclusionOptions): Reading[] {
+  return readings.filter(
+    (r) => !(opts.excludeDemo && isDemoRow(r)) && !(opts.excludeSynthetic && isSyntheticRow(r)),
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Readings table                                                      */
+/* ------------------------------------------------------------------ */
+
+export type Correctness = 'all' | 'correct' | 'incorrect' | 'no-estimate';
+
+export interface TableFilter {
+  venue: string; // '' = all
+  device: string; // '' = all
+  correctness: Correctness;
+}
+
+export const DEFAULT_TABLE_FILTER: TableFilter = { venue: '', device: '', correctness: 'all' };
+
+/**
+ * Floor-estimate source used to mark a row correct/incorrect. The CSV only
+ * carries floor estimates for barometer and GPS, so the iOS OS source falls
+ * back to the barometer estimate.
+ */
+export function estimateSourceFor(source: AltitudeSource): 'baro' | 'gps' {
+  return source === 'gps' ? 'gps' : 'baro';
+}
+
+export function estFloor(r: Reading, source: 'baro' | 'gps'): number | null {
+  const v = source === 'gps' ? r.estFloorIndexGps : r.estFloorIndexBaro;
+  return v === null || !Number.isFinite(v) ? null : v;
+}
+
+/** true = estimate matched true floor, false = mismatch, null = no estimate. */
+export function isCorrect(r: Reading, source: 'baro' | 'gps'): boolean | null {
+  const est = estFloor(r, source);
+  return est === null ? null : est === r.trueFloorIndex;
+}
+
+export function filterReadings(
+  readings: readonly Reading[],
+  filter: TableFilter,
+  source: 'baro' | 'gps',
+): Reading[] {
+  return readings.filter((r) => {
+    if (filter.venue && r.venueId !== filter.venue) return false;
+    if (filter.device && r.deviceModel !== filter.device) return false;
+    if (filter.correctness === 'all') return true;
+    const c = isCorrect(r, source);
+    if (filter.correctness === 'correct') return c === true;
+    if (filter.correctness === 'incorrect') return c === false;
+    return c === null;
+  });
+}
+
+/** Distinct venues (id + display name), sorted by name. */
+export function venueOptions(readings: readonly Reading[]): { id: string; name: string }[] {
+  const m = new Map<string, string>();
+  for (const r of readings) if (!m.has(r.venueId)) m.set(r.venueId, r.venueName || r.venueId);
+  return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function distinctSorted(readings: readonly Reading[], key: (r: Reading) => string): string[] {
+  return [...new Set(readings.map(key))].sort((a, b) => a.localeCompare(b));
+}
+
+export interface Page<T> {
+  items: T[];
+  page: number; // 0-based, clamped
+  pageCount: number; // >= 1
+  total: number;
+  from: number; // 1-based index of first item, 0 when empty
+  to: number;
+}
+
+export function paginate<T>(items: readonly T[], page: number, pageSize: number): Page<T> {
+  const size = Math.max(1, Math.floor(pageSize));
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const p = Math.min(Math.max(0, Math.floor(page)), pageCount - 1);
+  const start = p * size;
+  const slice = items.slice(start, start + size);
+  return {
+    items: slice,
+    page: p,
+    pageCount,
+    total: items.length,
+    from: slice.length ? start + 1 : 0,
+    to: start + slice.length,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Charts                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface ScatterPoint {
+  id: string;
+  x: number; // true floor centre (m)
+  y: number; // estimated relative altitude (m)
+  floor: string;
+  venue: string;
+  device: string;
+}
+
+/** Points of estimated altitude vs true floor centre for one source (rows without a value are skipped). */
+export function scatterPoints(readings: readonly Reading[], source: AltitudeSource): ScatterPoint[] {
+  const out: ScatterPoint[] = [];
+  for (const r of readings) {
+    const y = altitudeFor(r, source);
+    if (y === null || !Number.isFinite(r.trueFloorCenterM)) continue;
+    out.push({
+      id: r.id,
+      x: r.trueFloorCenterM,
+      y,
+      floor: r.trueFloorLabel,
+      venue: r.venueName || r.venueId,
+      device: r.deviceModel,
+    });
+  }
+  return out;
+}
+
+/** Evenly thin a list to at most `max` items (keeps charts responsive on large uploads). */
+export function thin<T>(items: readonly T[], max: number): T[] {
+  if (items.length <= max) return items.slice();
+  const step = items.length / max;
+  const out: T[] = [];
+  for (let i = 0; i < max; i++) out.push(items[Math.floor(i * step)]!);
+  return out;
+}
+
+export type DriftRow = ReturnType<typeof driftByMinutes>[number];
+
+export interface RecalibrationAdvice {
+  kind: 'no-data' | 'stable' | 'recalibrate' | 'exceeds-from-start';
+  /** Recommended max minutes between calibrations (for 'recalibrate'). */
+  minutes: number | null;
+  /** Half a floor height in meters (the threshold used). */
+  thresholdM: number;
+}
+
+/**
+ * Recommend a recalibration interval from drift buckets: the start of the first
+ * well-populated bucket whose p90 |error| reaches half a floor. Buckets with
+ * fewer than `minN` readings are ignored as too noisy to act on.
+ */
+export function recalibrationAdvice(
+  drift: readonly DriftRow[],
+  floorHeightM: number,
+  minN = 5,
+): RecalibrationAdvice {
+  const thresholdM = floorHeightM / 2;
+  const usable = drift.filter((d) => d.n >= minN && d.p90AbsErrorM !== null);
+  if (usable.length === 0) return { kind: 'no-data', minutes: null, thresholdM };
+  const firstBad = usable.find((d) => d.p90AbsErrorM! >= thresholdM);
+  if (!firstBad) return { kind: 'stable', minutes: null, thresholdM };
+  if (firstBad === usable[0]) return { kind: 'exceeds-from-start', minutes: null, thresholdM };
+  return { kind: 'recalibrate', minutes: firstBad.minutesFrom, thresholdM };
+}
+
+/* ------------------------------------------------------------------ */
+/* Formatting                                                          */
+/* ------------------------------------------------------------------ */
+
+export function fmtPct(x: number | null | undefined, dp = 1): string {
+  return x === null || x === undefined || !Number.isFinite(x) ? '—' : `${(x * 100).toFixed(dp)}%`;
+}
+
+export function fmtM(x: number | null | undefined, dp = 2): string {
+  return x === null || x === undefined || !Number.isFinite(x) ? '—' : `${x.toFixed(dp)} m`;
+}
+
+export function fmtNum(x: number | null | undefined, dp = 2): string {
+  return x === null || x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(dp);
+}
+
+export const SOURCE_LABEL: Record<AltitudeSource, string> = {
+  baro: 'Barometer',
+  gps: 'GPS',
+  os: 'iOS OS altitude',
+};
+
+/** Safe file name for CSV export: locus-readings-YYYYMMDD-HHMM.csv */
+export function exportFileName(now = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `locus-readings-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}.csv`;
+}

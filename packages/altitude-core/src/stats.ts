@@ -42,7 +42,7 @@ export function summarize(readings: Reading[], source: AltitudeSource, floorHeig
     meanErrorM: mean(errors),
     medianAbsErrorM: median(abs),
     p90AbsErrorM: percentile(abs, 90),
-    maxAbsErrorM: abs.length ? Math.max(...abs) : null,
+    maxAbsErrorM: abs.length ? abs.reduce((m, e) => (e > m ? e : m), -Infinity) : null,
     withinHalfFloor: abs.length ? abs.filter((e) => e < floorHeightM / 2).length / abs.length : null,
   };
 }

@@ -160,6 +160,12 @@ describe('statistics and gate', () => {
     expect(evaluateGate(readings, 4.5, 'gps').verdict).toBe('fail');
   });
 
+  it('handles very large datasets without stack overflow', () => {
+    const big: Reading[] = [];
+    while (big.length < 250_000) big.push(...readings);
+    expect(summarize(big, 'baro', 4.5).maxAbsErrorM).toBeGreaterThan(0);
+  });
+
   it('refuses a verdict on too little data', () => {
     const result = evaluateGate(readings.slice(0, 10), 4.5, 'baro', DEFAULT_GATE);
     expect(result.verdict).toBe('insufficient-data');
