@@ -3,16 +3,33 @@
  * filters, pagination and chart-shaping. All accuracy maths lives in
  * @locus/altitude-core; this module only arranges data around it.
  */
-import { altitudeFor, csvToReadings, driftByMinutes, floorHeightFor } from '@locus/altitude-core';
-import type { AltitudeSource, Reading } from '@locus/altitude-core';
+import {
+  altitudeFor,
+  csvToDeviceChecks,
+  csvToReadings,
+  driftByMinutes,
+  floorHeightFor,
+  isDeviceCheckCsv,
+} from '@locus/altitude-core';
+import type { AltitudeSource, DeviceCheck, Reading } from '@locus/altitude-core';
 
 /* ------------------------------------------------------------------ */
 /* Loading and merging                                                 */
 /* ------------------------------------------------------------------ */
 
+/** What a loaded CSV contains: field readings or device capability checks. */
+export type FileKind = 'readings' | 'device-checks';
+
+export const FILE_KIND_LABEL: Record<FileKind, string> = {
+  readings: 'Readings',
+  'device-checks': 'Device checks',
+};
+
 export interface FileReport {
   /** Display name of the file (or "Synthetic sample"). */
   name: string;
+  /** Which kind of export this file was detected as. */
+  kind: FileKind;
   /** Rows parsed successfully. */
   parsed: number;
   /** Parsed rows actually added (not duplicates of an already-loaded id). */
@@ -27,23 +44,24 @@ export interface FileReport {
 
 export interface Dataset {
   readings: Reading[];
+  deviceChecks: DeviceCheck[];
   files: FileReport[];
 }
 
-export const EMPTY_DATASET: Dataset = { readings: [], files: [] };
+export const EMPTY_DATASET: Dataset = { readings: [], deviceChecks: [], files: [] };
 
 /**
- * Merge new readings into an existing list, de-duplicating by reading id.
+ * Merge new rows into an existing list, de-duplicating by id.
  * The first occurrence of an id wins, so re-uploading a file is a no-op.
  * Rows with an empty id cannot be de-duplicated and are always kept.
  */
-export function mergeReadings(
-  existing: readonly Reading[],
-  incoming: readonly Reading[],
-): { readings: Reading[]; added: number; duplicates: number } {
+export function mergeById<T extends { id: string }>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): { items: T[]; added: number; duplicates: number } {
   const seen = new Set<string>();
   for (const r of existing) if (r.id) seen.add(r.id);
-  const readings = existing.slice();
+  const items = existing.slice();
   let added = 0;
   let duplicates = 0;
   for (const r of incoming) {
@@ -54,10 +72,28 @@ export function mergeReadings(
       }
       seen.add(r.id);
     }
-    readings.push(r);
+    items.push(r);
     added++;
   }
-  return { readings, added, duplicates };
+  return { items, added, duplicates };
+}
+
+/** Merge readings by reading id (see `mergeById`). */
+export function mergeReadings(
+  existing: readonly Reading[],
+  incoming: readonly Reading[],
+): { readings: Reading[]; added: number; duplicates: number } {
+  const m = mergeById(existing, incoming);
+  return { readings: m.items, added: m.added, duplicates: m.duplicates };
+}
+
+/** Merge device checks by check id (see `mergeById`). */
+export function mergeDeviceChecks(
+  existing: readonly DeviceCheck[],
+  incoming: readonly DeviceCheck[],
+): { deviceChecks: DeviceCheck[]; added: number; duplicates: number } {
+  const m = mergeById(existing, incoming);
+  return { deviceChecks: m.items, added: m.added, duplicates: m.duplicates };
 }
 
 /** Add one parsed source (a CSV file or the synthetic sample) to a dataset. */
@@ -70,11 +106,13 @@ export function addSource(
 ): Dataset {
   const merged = mergeReadings(dataset.readings, incoming);
   return {
+    ...dataset,
     readings: merged.readings,
     files: [
       ...dataset.files,
       {
         name,
+        kind: 'readings',
         parsed: incoming.length,
         added: merged.added,
         duplicates: merged.duplicates,
@@ -85,13 +123,64 @@ export function addSource(
   };
 }
 
-/** Parse CSV text and add it to a dataset. Never throws: problems land in the file report. */
+/** Add one parsed device-check source (a CSV file or the synthetic sample) to a dataset. */
+export function addDeviceCheckSource(
+  dataset: Dataset,
+  name: string,
+  incoming: readonly DeviceCheck[],
+  errors: readonly string[],
+  synthetic = false,
+): Dataset {
+  const merged = mergeDeviceChecks(dataset.deviceChecks, incoming);
+  return {
+    ...dataset,
+    deviceChecks: merged.deviceChecks,
+    files: [
+      ...dataset.files,
+      {
+        name,
+        kind: 'device-checks',
+        parsed: incoming.length,
+        added: merged.added,
+        duplicates: merged.duplicates,
+        errors: [...errors],
+        synthetic,
+      },
+    ],
+  };
+}
+
+/** Which kind of export a CSV is, from its header row. */
+export function detectFileKind(text: string): FileKind {
+  try {
+    return isDeviceCheckCsv(text) ? 'device-checks' : 'readings';
+  } catch {
+    return 'readings';
+  }
+}
+
+const parseFailure = (err: unknown) => `Could not parse file: ${err instanceof Error ? err.message : String(err)}`;
+
+/**
+ * Parse CSV text and add it to a dataset, routing device-check exports to the
+ * device-check list and everything else to readings. Never throws: problems
+ * land in the file report.
+ */
 export function addCsvText(dataset: Dataset, name: string, text: string): Dataset {
+  if (detectFileKind(text) === 'device-checks') {
+    let result: { checks: DeviceCheck[]; errors: string[] };
+    try {
+      result = csvToDeviceChecks(text);
+    } catch (err) {
+      result = { checks: [], errors: [parseFailure(err)] };
+    }
+    return addDeviceCheckSource(dataset, name, result.checks, result.errors);
+  }
   let result: { readings: Reading[]; errors: string[] };
   try {
     result = csvToReadings(text);
   } catch (err) {
-    result = { readings: [], errors: [`Could not parse file: ${err instanceof Error ? err.message : String(err)}`] };
+    result = { readings: [], errors: [parseFailure(err)] };
   }
   return addSource(dataset, name, result.readings, result.errors);
 }
@@ -109,15 +198,18 @@ export interface ExclusionOptions {
 
 export const DEFAULT_EXCLUSION: ExclusionOptions = { excludeDemo: true, excludeSynthetic: false };
 
-export function isDemoRow(r: Reading): boolean {
+/** Rows with free-text notes: readings and device checks share the exclusion rules. */
+type WithNotes = { notes?: string | null };
+
+export function isDemoRow(r: WithNotes): boolean {
   return (r.notes ?? '').trim().startsWith('DEMO');
 }
 
-export function isSyntheticRow(r: Reading): boolean {
+export function isSyntheticRow(r: WithNotes): boolean {
   return (r.notes ?? '').trim().toLowerCase() === 'synthetic';
 }
 
-export function applyExclusions(readings: readonly Reading[], opts: ExclusionOptions): Reading[] {
+export function applyExclusions<T extends WithNotes>(readings: readonly T[], opts: ExclusionOptions): T[] {
   return readings.filter(
     (r) => !(opts.excludeDemo && isDemoRow(r)) && !(opts.excludeSynthetic && isSyntheticRow(r)),
   );

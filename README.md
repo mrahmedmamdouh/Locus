@@ -13,6 +13,8 @@ Locus is a location-based offers platform for banks in Egypt and Oman: when a ca
 
 Air pressure drops by about 0.12 hPa per metre near sea level (roughly 8.6 m per hPa at 24 °C), so one 4.5 m mall floor is about 0.5 hPa, which modern phone barometers resolve easily. Weather moves absolute pressure by several hPa a day, so we never use absolute altitude: we record the pressure at the entrance and compute height **relative** to it with the hypsometric equation. GPS altitude is recorded alongside as the baseline to beat. The reasoning is in [ADR 0001](docs/adr/0001-barometer-relative-altitude.md).
 
+Many budget Android phones have no barometer. The app's **device check** records which altitude sources each phone really has, and the dashboard shows sensor coverage by model. Alternatives for those phones (Wi-Fi fingerprinting, crowd-calibration, inertial floor changes, beacons) are compared in [ADR 0002](docs/adr/0002-floor-detection-without-barometer.md).
+
 ## Repository structure
 
 | Path | What it is |

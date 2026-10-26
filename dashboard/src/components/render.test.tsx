@@ -9,6 +9,8 @@ import { ReadingsTable } from './ReadingsTable';
 import { DataLoader } from './DataLoader';
 import { SettingsPanel } from './SettingsPanel';
 import { SourceComparison } from './SourceComparison';
+import { SensorCoverage } from './SensorCoverage';
+import { generateSampleDeviceChecks } from '../lib/coverage';
 
 // Smoke tests: components render with real analysis output (no DOM needed).
 describe('render smoke tests', () => {
@@ -60,7 +62,7 @@ describe('render smoke tests', () => {
   it('lists per-file parse errors', () => {
     const html = renderToString(
       <DataLoader
-        files={[{ name: 'a.csv', parsed: 1, added: 1, duplicates: 0, errors: ['Row 2: bad'], synthetic: false }]}
+        files={[{ name: 'a.csv', kind: 'readings', parsed: 1, added: 1, duplicates: 0, errors: ['Row 2: bad'], synthetic: false }]}
         total={1}
         included={1}
         exclusion={{ excludeDemo: true, excludeSynthetic: false }}
@@ -71,5 +73,55 @@ describe('render smoke tests', () => {
       />,
     );
     expect(html).toContain('Row 2: bad');
+  });
+
+  it('lists the detected kind of each file', () => {
+    const html = renderToString(
+      <DataLoader
+        files={[{ name: 'd.csv', kind: 'device-checks', parsed: 2, added: 2, duplicates: 0, errors: [], synthetic: false }]}
+        total={0}
+        included={0}
+        totalChecks={2}
+        includedChecks={2}
+        exclusion={{ excludeDemo: true, excludeSynthetic: false }}
+        onFiles={() => {}}
+        onSample={() => {}}
+        onClear={() => {}}
+        onExclusion={() => {}}
+      />,
+    );
+    expect(html).toContain('Device checks');
+    expect(html).toMatch(/2<\/strong> of 2 device checks/);
+  });
+
+  it('sensor coverage shows a hint without device checks', () => {
+    const html = renderToString(<SensorCoverage checks={[]} readings={readings} />);
+    expect(html).toContain('Export device checks from the app to see sensor coverage');
+    expect(html).toContain('Export device checks');
+    expect(renderToString(<App />)).toContain('Export device checks from the app to see sensor coverage');
+  });
+
+  it('sensor coverage renders headline, tables, status text and cross-check', () => {
+    const checks = generateSampleDeviceChecks();
+    const html = renderToString(<SensorCoverage checks={checks} readings={readings} synthetic />);
+    expect(html).toMatch(/4 of 11 phones \(36%\)/);
+    expect(html).toContain('latest check');
+    expect(html).toContain('tag-synthetic');
+    expect(html).toContain('By platform');
+    expect(html).toContain('By brand');
+    expect(html).toContain('Blocked by permission');
+    expect(html).toMatch(/status-bad[^>]*>.*?No</);
+    expect(html).toContain('Galaxy A54'); // in readings, no device check
+    expect(html).toContain('Tecno Spark 20'); // device check, no readings
+    expect(html).toContain('2026-10-13');
+  });
+
+  it('sensor coverage escapes untrusted CSV text', () => {
+    const [c] = generateSampleDeviceChecks();
+    const html = renderToString(
+      <SensorCoverage checks={[{ ...c!, deviceModel: '<img src=x onerror=alert(1)>' }]} readings={[]} />,
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;img');
   });
 });

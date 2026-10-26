@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { ExclusionOptions, FileReport } from '../lib/data';
+import { FILE_KIND_LABEL, type ExclusionOptions, type FileReport } from '../lib/data';
 import { Card } from './common';
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
@@ -30,6 +30,8 @@ export function DataLoader({
   files,
   total,
   included,
+  totalChecks = 0,
+  includedChecks = 0,
   exclusion,
   onFiles,
   onSample,
@@ -39,6 +41,8 @@ export function DataLoader({
   files: FileReport[];
   total: number;
   included: number;
+  totalChecks?: number;
+  includedChecks?: number;
   exclusion: ExclusionOptions;
   onFiles: (files: LoadedFile[]) => void;
   onSample: () => void;
@@ -66,7 +70,7 @@ export function DataLoader({
   return (
     <Card
       title="Load data"
-      subtitle="CSV exports from the Locus field-test app. Files are read locally and never uploaded."
+      subtitle="Readings and device-check CSV exports from the Locus field-test app. Files are read locally and never uploaded."
     >
       <label
         htmlFor={inputId}
@@ -83,7 +87,7 @@ export function DataLoader({
         }}
       >
         <strong>{busy ? 'Reading files…' : 'Drop CSV files here or choose files'}</strong>
-        <span className="small muted">Multiple files are merged; duplicate reading ids are skipped.</span>
+        <span className="small muted">Each file is detected as readings or device checks. Multiple files are merged; duplicate ids are skipped.</span>
         <input
           ref={inputRef}
           id={inputId}
@@ -133,12 +137,20 @@ export function DataLoader({
           <p className="small" style={{ marginTop: 14 }} aria-live="polite">
             <strong>{included.toLocaleString()}</strong> of {total.toLocaleString()} loaded readings included in
             the analysis.
+            {totalChecks > 0 ? (
+              <>
+                {' '}
+                <strong>{includedChecks.toLocaleString()}</strong>
+                {` of ${totalChecks.toLocaleString()} device checks included in sensor coverage.`}
+              </>
+            ) : null}
           </p>
           <ul className="file-list" aria-label="Loaded files">
             {files.map((f, i) => (
               <li key={`${f.name}-${i}`} className="file-item">
                 <div>
                   <span className="file-name">{f.name}</span>{' '}
+                  <span className={`tag tag-kind`}>{FILE_KIND_LABEL[f.kind]}</span>{' '}
                   {f.synthetic ? <span className="tag tag-synthetic">Synthetic</span> : null}
                 </div>
                 <div className="small muted">

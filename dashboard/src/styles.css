@@ -810,3 +810,27 @@ details.data-table[open] > summary {
     animation: none !important;
   }
 }
+
+/* ---------- sensor coverage ---------- */
+.tag-kind {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--border);
+}
+.coverage-headline {
+  font-size: 1.15rem;
+  margin-bottom: 4px;
+}
+.coverage-grid {
+  margin-top: 14px;
+  gap: 16px;
+}
+.coverage-grid h3 {
+  margin-bottom: 6px;
+}
+.model-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  word-break: break-word;
+}

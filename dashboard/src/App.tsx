@@ -5,8 +5,10 @@ import {
   DEFAULT_EXCLUSION,
   EMPTY_DATASET,
   addCsvText,
+  addDeviceCheckSource,
   addSource,
   applyExclusions,
+  isSyntheticRow,
   type Dataset,
   type ExclusionOptions,
 } from './lib/data';
@@ -19,10 +21,13 @@ import { Breakdowns } from './components/Breakdowns';
 import { DriftChart } from './components/DriftChart';
 import { ErrorScatter } from './components/ErrorScatter';
 import { ReadingsTable } from './components/ReadingsTable';
+import { SensorCoverage } from './components/SensorCoverage';
+import { generateSampleDeviceChecks } from './lib/coverage';
 import { IconAlert } from './components/common';
 
 const PROTOCOL_URL = 'https://github.com/mrahmedmamdouh/Locus/blob/main/docs/field-test-protocol.md';
 const SAMPLE_NAME = 'Synthetic sample (generated, not field data)';
+const SAMPLE_CHECKS_NAME = 'Synthetic device checks (generated, not real phones)';
 
 function ExplainPanel() {
   return (
@@ -75,6 +80,10 @@ export function App() {
   const [settings, setSettings] = useState<Settings>(() => structuredClone(DEFAULT_SETTINGS));
 
   const included = useMemo(() => applyExclusions(dataset.readings, exclusion), [dataset.readings, exclusion]);
+  const includedChecks = useMemo(
+    () => applyExclusions(dataset.deviceChecks, exclusion),
+    [dataset.deviceChecks, exclusion],
+  );
   const result = useMemo(() => (included.length ? safeAnalyze(included, settings) : null), [included, settings]);
 
   const onFiles = useCallback((files: LoadedFile[]) => {
@@ -86,7 +95,17 @@ export function App() {
     );
   }, []);
   const onSample = useCallback(() => {
-    setDataset((ds) => (ds.files.some((f) => f.synthetic) ? ds : addSource(ds, SAMPLE_NAME, generateSampleReadings(), [], true)));
+    setDataset((ds) =>
+      ds.files.some((f) => f.synthetic)
+        ? ds
+        : addDeviceCheckSource(
+            addSource(ds, SAMPLE_NAME, generateSampleReadings(), [], true),
+            SAMPLE_CHECKS_NAME,
+            generateSampleDeviceChecks(),
+            [],
+            true,
+          ),
+    );
     // Make sure the sample is actually visible.
     setExclusion((e) => ({ ...e, excludeSynthetic: false }));
   }, []);
@@ -152,6 +171,8 @@ export function App() {
             files={dataset.files}
             total={dataset.readings.length}
             included={included.length}
+            totalChecks={dataset.deviceChecks.length}
+            includedChecks={includedChecks.length}
             exclusion={exclusion}
             onFiles={onFiles}
             onSample={onSample}
@@ -189,6 +210,12 @@ export function App() {
         ) : (
           <EmptyState onSample={onSample} />
         )}
+
+        <SensorCoverage
+          checks={includedChecks}
+          readings={included}
+          synthetic={includedChecks.some(isSyntheticRow)}
+        />
 
         <ExplainPanel />
       </main>
