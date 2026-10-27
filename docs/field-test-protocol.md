@@ -10,8 +10,9 @@ A good session takes about 60–90 minutes per venue for one tester with one pho
   - one **iPhone** (iPhone 8 or newer; all have a barometer),
   - one **mid-range Android** (e.g. Samsung Galaxy A5x, Xiaomi Redmi Note, Oppo Reno), because that is what most bank customers carry,
   - ideally one flagship Android (Pixel or Galaxy S).
-  Check the Android phone has a pressure sensor before you go: the app shows "barometer unavailable" if not. Many budget Androids have none; record that as a finding, not a failure.
-- The Locus app installed through Expo Go (see the [README](../README.md#quick-start)), on the latest build.
+  Run the app's **device check** on every phone before you go (Settings → Device check). Many budget Androids have no barometer; record that as a finding, not a failure. Those phones still matter: their Wi-Fi scans test the barometer-free approach ([ADR 0002](adr/0002-floor-detection-without-barometer.md)).
+- The Locus Field app on the latest build: the APK from the [latest release](https://github.com/mrahmedmamdouh/Locus/releases/latest) on Android, TestFlight on iPhone ([guide](ios-testflight.md)).
+- **Android phones, for Wi-Fi scans:** Wi-Fi **on** (no need to join a network), Location **on**, and Wi-Fi scan throttling **off**: enable Developer options (tap *Build number* 7 times in *About phone*), then *Developer options → Networking → Wi-Fi scan throttling* off. Without this, Android allows only 4 scans every 2 minutes.
 - Phones charged above 80%, plus a power bank. Battery saver **off** (it throttles sensors).
 - Location permission set to "While using the app", precise location on.
 - A notebook or a notes app for the venue sheet (section 2).
@@ -74,7 +75,8 @@ For each reading:
 1. Walk to the spot, **stop, and stand still for about 5 seconds** with the phone in your hand.
 2. Confirm the floor from a directory sign, a lift lobby label or the shop unit number (e.g. "F1-23").
 3. Select the true floor in the app and tap **Record**. The app averages several sensor samples into one reading.
-4. Add a short note only if something unusual happened (`near door`, `escalator moving`, `phone in pocket`). See section 6 for what never goes in notes.
+4. On Android, check the result card's Wi-Fi line says **fresh**. If it says *cached* or *throttled*, wait 30 seconds before the next reading, or turn off scan throttling (section 1).
+5. Add a short note only if something unusual happened (`near door`, `escalator moving`, `phone in pocket`). See section 6 for what never goes in notes.
 
 **Mezzanines and split levels:** record them as their own floor with their own measured band if the mall signs them as a level. If you cannot tell whether you are on the mezzanine or the floor below, do not record there.
 
@@ -100,8 +102,12 @@ Suggested venues are large multi-level malls with atriums (in Cairo: e.g. Mall o
 
 ## 6. Data handling
 
-- **Export a CSV at the end of every test day** (and before uninstalling or updating the app). Data lives only on the phone until exported.
-- **File name:** `locus_<country>_<venue-slug>_<yyyy-mm-dd>_<device>_<tester-initials>.csv`, e.g. `locus_EG_city-stars_2026-11-14_pixel8_am.csv`.
+- **Export at the end of every test day** (and before uninstalling or updating the app). Data lives only on the phone until exported. The Data tab has three exports; send all that apply:
+  - **Readings** (every phone),
+  - **Wi-Fi scans** (Android phones),
+  - **Device checks** (every phone, including ones that cannot do the barometer test).
+- **File name:** `locus_<country>_<venue-slug>_<yyyy-mm-dd>_<device>_<tester-initials>_<kind>.csv` with kind `readings`, `wifi` or `devices`, e.g. `locus_EG_city-stars_2026-11-14_pixel8_am_wifi.csv`. Load all of them together in the dashboard.
+- **Wi-Fi data:** the app stores access point hardware addresses and signal strengths only. It never stores network names, and it drops phone hotspots and randomised addresses.
 - Upload to the team's shared drive folder for the test. **Do not commit CSVs to this repository** and do not post them in public channels; they contain precise indoor GPS fixes.
 - **Never put personal data in notes:** no names, phone numbers, faces, card numbers, or descriptions of other shoppers. Notes are for conditions only.
 - Keep your venue sheet with the CSV (same file name, `.txt`).

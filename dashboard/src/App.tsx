@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { generateSampleReadings } from '@locus/altitude-core';
+import { generateSampleReadings, generateSampleWifiScans } from '@locus/altitude-core';
 import { analyze, type Analysis } from './lib/analysis';
 import {
   DEFAULT_EXCLUSION,
@@ -7,7 +7,9 @@ import {
   addCsvText,
   addDeviceCheckSource,
   addSource,
+  addWifiScanSource,
   applyExclusions,
+  applyScanExclusions,
   isSyntheticRow,
   type Dataset,
   type ExclusionOptions,
@@ -22,12 +24,14 @@ import { DriftChart } from './components/DriftChart';
 import { ErrorScatter } from './components/ErrorScatter';
 import { ReadingsTable } from './components/ReadingsTable';
 import { SensorCoverage } from './components/SensorCoverage';
+import { WifiFloorTest } from './components/WifiFloorTest';
 import { generateSampleDeviceChecks } from './lib/coverage';
 import { IconAlert } from './components/common';
 
 const PROTOCOL_URL = 'https://github.com/mrahmedmamdouh/Locus/blob/main/docs/field-test-protocol.md';
 const SAMPLE_NAME = 'Synthetic sample (generated, not field data)';
 const SAMPLE_CHECKS_NAME = 'Synthetic device checks (generated, not real phones)';
+const SAMPLE_WIFI_NAME = 'Synthetic Wi-Fi scans (generated, not measured in a mall)';
 
 function ExplainPanel() {
   return (
@@ -84,6 +88,14 @@ export function App() {
     () => applyExclusions(dataset.deviceChecks, exclusion),
     [dataset.deviceChecks, exclusion],
   );
+  const includedScans = useMemo(
+    () => applyScanExclusions(dataset.wifiScans, dataset.readings, exclusion),
+    [dataset.wifiScans, dataset.readings, exclusion],
+  );
+  const scansSynthetic = useMemo(() => {
+    const synth = new Set(dataset.readings.filter(isSyntheticRow).map((r) => r.id));
+    return includedScans.some((s) => synth.has(s.readingId));
+  }, [dataset.readings, includedScans]);
   const result = useMemo(() => (included.length ? safeAnalyze(included, settings) : null), [included, settings]);
 
   const onFiles = useCallback((files: LoadedFile[]) => {
@@ -95,17 +107,25 @@ export function App() {
     );
   }, []);
   const onSample = useCallback(() => {
-    setDataset((ds) =>
-      ds.files.some((f) => f.synthetic)
-        ? ds
-        : addDeviceCheckSource(
-            addSource(ds, SAMPLE_NAME, generateSampleReadings(), [], true),
-            SAMPLE_CHECKS_NAME,
-            generateSampleDeviceChecks(),
-            [],
-            true,
-          ),
-    );
+    setDataset((ds) => {
+      if (ds.files.some((f) => f.synthetic)) return ds;
+      const readings = generateSampleReadings();
+      // Fills wifiApCount on these same reading objects before they are added.
+      const scans = generateSampleWifiScans(readings);
+      return addWifiScanSource(
+        addDeviceCheckSource(
+          addSource(ds, SAMPLE_NAME, readings, [], true),
+          SAMPLE_CHECKS_NAME,
+          generateSampleDeviceChecks(),
+          [],
+          true,
+        ),
+        SAMPLE_WIFI_NAME,
+        scans,
+        [],
+        true,
+      );
+    });
     // Make sure the sample is actually visible.
     setExclusion((e) => ({ ...e, excludeSynthetic: false }));
   }, []);
@@ -173,6 +193,8 @@ export function App() {
             included={included.length}
             totalChecks={dataset.deviceChecks.length}
             includedChecks={includedChecks.length}
+            totalScans={dataset.wifiScans.length}
+            includedScans={includedScans.length}
             exclusion={exclusion}
             onFiles={onFiles}
             onSample={onSample}
@@ -216,6 +238,8 @@ export function App() {
           readings={included}
           synthetic={includedChecks.some(isSyntheticRow)}
         />
+
+        <WifiFloorTest scans={includedScans} readings={included} synthetic={scansSynthetic} />
 
         <ExplainPanel />
       </main>

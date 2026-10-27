@@ -106,6 +106,14 @@ export interface Reading {
 
   /** Number of raw sensor samples averaged into this reading. */
   sampleCount: number;
+
+  /**
+   * Wi-Fi scan taken with this reading (Android only); details are in the
+   * separate Wi-Fi CSV, joined by reading id. Null in older exports.
+   */
+  wifiScanStatus: string | null;
+  /** Access points kept after cleaning (hotspots dropped). */
+  wifiApCount: number | null;
   notes: string;
 }
 

@@ -1,6 +1,7 @@
 import { buildUniformFloors, classifyFloor, floorCenterM } from './floors';
 import { relativeAltitudeFromPressure } from './pressure';
 import type { Reading } from './types';
+import { cleanAccessPoints, type WifiScan } from './wifi';
 
 /** Deterministic pseudo-random generator (mulberry32) so sample data is reproducible. */
 function rng(seed: number): () => number {
@@ -80,6 +81,8 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
             estFloorIndexBaro: classifyFloor(baro, venue.floors)?.index ?? null,
             estFloorIndexGps: classifyFloor(gpsRel, venue.floors)?.index ?? null,
             sampleCount: 50,
+            wifiScanStatus: device.platform === 'android' ? 'ok' : 'unsupported',
+            wifiApCount: null, // filled by generateSampleWifiScans
             notes: 'synthetic',
           });
         }
@@ -91,5 +94,58 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
 
 function round(x: number, dp: number): number {
   const f = 10 ** dp;
-  return Math.round(x * f) / f;
+  return Math.round(x * f) / f || 0; // || 0 turns -0 into 0
+}
+
+/**
+ * SYNTHETIC Wi-Fi scans for the Android sample readings (demos and tests only).
+ * Each venue has a few access points per floor; signal falls with distance and
+ * by ~15 dB per floor slab, plus noise. Mutates `wifiApCount` on the readings.
+ */
+export function generateSampleWifiScans(readings: Reading[], seed = 7): WifiScan[] {
+  const rand = rng(seed);
+  const apsByVenue = new Map<string, { bssid: string; floor: number; x: number; y: number; freq: number }[]>();
+  for (const r of readings) {
+    if (apsByVenue.has(r.venueId)) continue;
+    const floors = [...new Set(readings.filter((x) => x.venueId === r.venueId).map((x) => x.trueFloorIndex))];
+    const aps: { bssid: string; floor: number; x: number; y: number; freq: number }[] = [];
+    let n = 0;
+    for (const f of floors) {
+      for (let i = 0; i < 4; i++) {
+        n++;
+        const hex = (v: number) => v.toString(16).padStart(2, '0');
+        aps.push({
+          bssid: `a4:${hex(r.venueId.length)}:${hex(f + 10)}:${hex(i)}:${hex(n)}:${hex(Math.floor(rand() * 255))}`,
+          floor: f,
+          x: rand() * 120,
+          y: rand() * 60,
+          freq: rand() < 0.5 ? 2437 : 5180,
+        });
+      }
+    }
+    apsByVenue.set(r.venueId, aps);
+  }
+  const scans: WifiScan[] = [];
+  for (const r of readings) {
+    if (r.platform !== 'android') continue;
+    const px = rand() * 120;
+    const py = rand() * 60;
+    const raw = (apsByVenue.get(r.venueId) ?? []).map((ap) => {
+      const d = Math.max(1, Math.hypot(ap.x - px, ap.y - py));
+      const rssi = -35 - 25 * Math.log10(d) - 15 * Math.abs(ap.floor - r.trueFloorIndex) + gauss(rand) * 4;
+      return { bssid: ap.bssid, rssiDbm: Math.round(rssi), frequencyMhz: ap.freq, rttResponder: false, ageMs: Math.floor(rand() * 4000) };
+    });
+    const { aps } = cleanAccessPoints(raw.filter((a) => a.rssiDbm > -92));
+    r.wifiApCount = aps.length;
+    scans.push({
+      readingId: r.id,
+      sessionId: r.sessionId,
+      venueId: r.venueId,
+      trueFloorIndex: r.trueFloorIndex,
+      scannedAt: r.timestamp,
+      status: 'ok',
+      aps,
+    });
+  }
+  return scans;
 }

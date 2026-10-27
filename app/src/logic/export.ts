@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { deviceChecksToCsv, readingsToCsv, type DeviceCheck, type Reading } from '@locus/altitude-core';
-import { csvFileName, deviceChecksFileName } from './exportName';
+import { deviceChecksToCsv, readingsToCsv, wifiScansToCsv, type DeviceCheck, type Reading, type WifiScan } from '@locus/altitude-core';
+import { csvFileName, deviceChecksFileName, wifiScansFileName } from './exportName';
 
 /**
  * Write readings to a CSV in the cache directory and open the share sheet.
@@ -18,6 +18,11 @@ export async function exportReadingsCsv(readings: Reading[], label: string): Pro
  */
 export async function exportDeviceChecksCsv(checks: DeviceCheck[]): Promise<string> {
   return shareCsv(deviceChecksToCsv(checks), deviceChecksFileName(new Date()), 'Export Locus device checks');
+}
+
+/** Wi-Fi scans: one row per access point, joined to readings by readingId. */
+export async function exportWifiScansCsv(scans: WifiScan[]): Promise<string> {
+  return shareCsv(wifiScansToCsv(scans), wifiScansFileName(new Date()), 'Export Locus Wi-Fi scans');
 }
 
 async function shareCsv(csv: string, name: string, dialogTitle: string): Promise<string> {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Reading } from '@locus/altitude-core';
+import type { Reading, WifiScan } from '@locus/altitude-core';
 
 // The real module needs React Native; the app singleton is never used in these tests.
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: {} }));
 
-import { KEYS, createStorage, readingKey, type KeyValueStore } from '../src/state/storage';
+import { KEYS, createStorage, readingKey, wifiKey, type KeyValueStore } from '../src/state/storage';
 
 class MemoryStore implements KeyValueStore {
   data = new Map<string, string>();
@@ -158,5 +158,67 @@ describe('storage: per-session writes', () => {
     const biggest = Math.max(...[...kv.data.values()].map((v) => v.length));
     expect(biggest).toBeLessThan(2 * 1024 * 1024);
     expect((await createStorage(kv).loadAll()).readings).toHaveLength(5000);
+  });
+});
+
+describe('storage: Wi-Fi scans', () => {
+  const scan = (readingId: string, sessionId: string): WifiScan => ({
+    readingId,
+    sessionId,
+    venueId: 'v1',
+    trueFloorIndex: 1,
+    scannedAt: '2026-10-27T10:00:00.000Z',
+    status: 'ok',
+    aps: [{ bssid: 'a0:b1:c2:d3:e4:01', rssiDbm: -50, frequencyMhz: 2412, rttResponder: null, ageMs: 10 }],
+  });
+
+  it('stores scans per session under their own keys and loads them back', async () => {
+    const store = createStorage(kv);
+    expect((await store.loadAll()).wifiScans).toEqual([]);
+    const [a, b] = [scan('r1', 's1'), scan('r2', 's2')];
+    await store.saveWifiScans([a, b]);
+    expect(JSON.parse(kv.data.get(KEYS.wifiIndex)!)).toEqual(['s1', 's2']);
+    expect(kv.data.has(wifiKey('s1'))).toBe(true);
+    expect(kv.data.has(readingKey('s1'))).toBe(false);
+    kv.writes = [];
+    await store.saveWifiScans([a, b, scan('r3', 's2')]);
+    expect(kv.writes).toEqual([wifiKey('s2')]);
+    expect((await createStorage(kv).loadAll()).wifiScans.map((s) => s.readingId)).toEqual(['r1', 'r2', 'r3']);
+  });
+
+  it('deleting and clearing remove scan keys', async () => {
+    const store = createStorage(kv);
+    await store.loadAll();
+    await store.saveWifiScans([scan('r1', 's1'), scan('r2', 's2')]);
+    await store.saveWifiScans([scan('r1', 's1')]);
+    expect(kv.data.has(wifiKey('s2'))).toBe(false);
+    await store.saveWifiScans([]);
+    expect([...kv.data.keys()].filter((k) => k.startsWith(KEYS.wifiPrefix))).toEqual([]);
+  });
+
+  it('a corrupt scan key is backed up, not lost, and readings still load', async () => {
+    kv.data.set(KEYS.wifiIndex, JSON.stringify(['s1']));
+    kv.data.set(wifiKey('s1'), '{broken');
+    kv.data.set(readingKey('s1'), JSON.stringify([reading('s1')]));
+    const state = await createStorage(kv).loadAll();
+    expect(state.wifiScans).toEqual([]);
+    expect(state.readings).toHaveLength(1);
+    const backup = [...kv.data.keys()].find((k) => k.startsWith(`${wifiKey('s1')}.corrupt.`));
+    expect(backup && kv.data.get(backup)).toBe('{broken');
+  });
+
+  it('fails the load (nothing overwritten) if a corrupt scan key cannot be backed up', async () => {
+    kv.data.set(wifiKey('s1'), 'garbage');
+    kv.failSet = (k) => k.includes('.corrupt.');
+    await expect(createStorage(kv).loadAll()).rejects.toThrow();
+    expect(kv.data.get(wifiKey('s1'))).toBe('garbage');
+  });
+
+  it('old readings without Wi-Fi fields load with nulls; settings default to recording Wi-Fi', async () => {
+    kv.data.set(KEYS.readingIndex, JSON.stringify(['s1']));
+    kv.data.set(readingKey('s1'), JSON.stringify([{ id: 'old', sessionId: 's1', notes: '' }]));
+    const state = await createStorage(kv).loadAll();
+    expect(state.readings[0]).toMatchObject({ wifiScanStatus: null, wifiApCount: null, trueFloorHeightM: null });
+    expect(state.settings.recordWifi).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Locus Field",
     "slug": "locus-field",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,7 +26,9 @@
       "package": "com.locus.field",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_WIFI_STATE",
+        "CHANGE_WIFI_STATE"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

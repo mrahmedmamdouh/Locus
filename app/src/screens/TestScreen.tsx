@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Device from 'expo-device';
-import { floorCenterM, type Floor, type Reading } from '@locus/altitude-core';
+import { floorCenterM, type Floor, type Reading, type WifiScan, type WifiScanStatus } from '@locus/altitude-core';
 import { useAppState } from '../state/AppState';
 import { useSensors } from '../state/SensorContext';
 import { useNow } from '../hooks/useNow';
@@ -9,6 +9,8 @@ import { liveEstimate } from '../logic/live';
 import { buildReading, readingOutcome, type SourceOutcome } from '../logic/reading';
 import { deviceModelLabel } from '../logic/device';
 import { makeId } from '../logic/ids';
+import { THROTTLE_TIP, WIFI_SCAN_TIMEOUT_MS, describeWifiScan, shouldShowThrottleTip, toWifiScan } from '../logic/wifi';
+import { scanWifi, wifiScanSupported } from '../native/wifi';
 import { fmt, fmtSigned } from '../logic/numbers';
 import { DRIFT_WARNING_SECONDS, formatElapsed, secondsBetween } from '../logic/time';
 import { Banner, Button, Card, Field, H1, H2, Muted, Row, Stat } from '../ui/kit';
@@ -66,6 +68,9 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
   const [note, setNote] = useState('');
   const [recording, setRecording] = useState<{ secondsLeft: number; samples: number } | null>(null);
   const [last, setLast] = useState<Reading | null>(null);
+  const [lastWifi, setLastWifi] = useState<WifiScan | null>(null);
+  /** Wi-Fi statuses of this session's recordings, for the throttling tip. */
+  const [wifiHistory, setWifiHistory] = useState<WifiScanStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
   /** Synchronous guard: state updates are async, so a fast double tap could otherwise start two recordings. */
@@ -105,10 +110,14 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
     setRecordingInProgress(true);
     setError(null);
     setLast(null);
+    setLastWifi(null);
     const start = Date.now();
     setRecording({ secondsLeft: RECORD_MS / 1000, samples: 0 });
+    // Wi-Fi scan runs in parallel with the barometer window (Android only; never rejects).
+    const wantWifi = wifiScanSupported && settings.recordWifi;
+    const wifiPromise = wantWifi ? scanWifi(WIFI_SCAN_TIMEOUT_MS) : Promise.resolve(null);
     try {
-      const window = baroUsable
+      const windowPromise = baroUsable
         ? await baro.collect(RECORD_MS, (count) => {
             if (mounted.current) {
               setRecording({ secondsLeft: Math.max(0, Math.ceil((RECORD_MS - (Date.now() - start)) / 1000)), samples: count });
@@ -117,26 +126,44 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
         : await new Promise<{ pressures: number[]; osRelAlts: number[]; epoch: string | null }>((resolve) =>
             setTimeout(() => resolve({ pressures: [], osRelAlts: [], epoch: null }), 1000),
           );
+      const [window, rawWifi] = await Promise.all([windowPromise, wifiPromise]);
+      const readingId = makeId('r');
+      const now = new Date();
+      const wifi = toWifiScan(
+        rawWifi,
+        {
+          readingId,
+          sessionId: session.id,
+          venueId: venue.id,
+          trueFloorIndex: trueFloor.index,
+          scannedAt: new Date(start).toISOString(),
+        },
+        wifiScanSupported && !settings.recordWifi,
+      );
       // Read the GPS fix AFTER the window from the ref (not the fix captured when Record was tapped);
       // buildReading only keeps it if it was taken during the window.
       const reading = buildReading({
-        id: makeId('r'),
+        id: readingId,
         session,
         venue,
         trueFloor,
         baro: window,
         gps: location.getLatest(),
         windowStart: new Date(start),
-        now: new Date(),
+        now,
         deviceModel: deviceModelLabel({ modelName: Device.modelName, brand: Device.brand, modelId: Device.modelId }),
         platform: Platform.OS,
         note,
         demo: settings.demoMode,
+        wifi,
       });
       // Saved even if this screen unmounted meanwhile: a reading is never silently dropped.
-      addReading(reading);
+      // The scan is stored only where Wi-Fi can be scanned (not for 'unsupported').
+      addReading(reading, wifi.status === 'unsupported' ? null : wifi);
       if (mounted.current) {
         setLast(reading);
+        setLastWifi(wifi);
+        setWifiHistory((h) => [...h.slice(-9), wifi.status]);
         setNote('');
       }
     } catch (e) {
@@ -241,12 +268,22 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
         />
       </Card>
 
-      {last ? <ResultCard reading={last} floors={venue.floors} /> : null}
+      {last ? <ResultCard reading={last} floors={venue.floors} wifi={lastWifi} wifiHistory={wifiHistory} /> : null}
     </View>
   );
 }
 
-function ResultCard({ reading, floors }: { reading: Reading; floors: Floor[] }) {
+function ResultCard({
+  reading,
+  floors,
+  wifi,
+  wifiHistory,
+}: {
+  reading: Reading;
+  floors: Floor[];
+  wifi: WifiScan | null;
+  wifiHistory: WifiScanStatus[];
+}) {
   const o = readingOutcome(reading, floors);
   const primary = o.baro.correct !== null ? o.baro : o.gps;
   const tone = primary.correct === null ? 'neutral' : primary.correct ? 'good' : 'bad';
@@ -261,6 +298,15 @@ function ResultCard({ reading, floors }: { reading: Reading; floors: Floor[] }) 
       <SourceLine name="Barometer" o={o.baro} />
       <SourceLine name="GPS" o={o.gps} />
       {reading.osRelAltM !== null ? <SourceLine name="iOS altimeter" o={o.os} /> : null}
+      {wifi && wifi.status !== 'unsupported' ? <Text style={st.wifiLine}>Wi-Fi: {describeWifiScan(wifi)}</Text> : null}
+      {wifi?.status === 'location-off' ? (
+        <Banner tone="warn">Android needs Location turned on to scan Wi-Fi. Turn Location on in the quick settings.</Banner>
+      ) : null}
+      {wifi?.status === 'no-permission' ? (
+        <Banner tone="warn">Wi-Fi scanning needs the precise location permission. Allow it in Android settings for Locus.</Banner>
+      ) : null}
+      {wifi?.status === 'wifi-off' ? <Banner tone="warn">Turn Wi-Fi on (you do not need to connect to a network).</Banner> : null}
+      {shouldShowThrottleTip(wifiHistory) ? <Banner tone="warn">{THROTTLE_TIP}</Banner> : null}
       <Muted>
         {reading.sampleCount} barometer samples · saved {new Date(reading.timestamp).toLocaleTimeString()}
       </Muted>
@@ -300,4 +346,5 @@ const st = StyleSheet.create({
   floorText: { fontSize: 24, fontWeight: '700', color: colors.text },
   resultTitle: { fontSize: 24, fontWeight: '700', marginBottom: space.xs },
   sourceLine: { fontSize: 17, fontWeight: '600', marginVertical: 2 },
+  wifiLine: { fontSize: 15, color: colors.text, marginVertical: 4 },
 });

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { summarize, typicalFloorHeightM, type AccuracySummary, type DeviceCheck, type Reading } from '@locus/altitude-core';
 import { useAppState } from '../state/AppState';
-import { exportDeviceChecksCsv, exportReadingsCsv } from '../logic/export';
+import { exportDeviceChecksCsv, exportReadingsCsv, exportWifiScansCsv } from '../logic/export';
+import { wifiReadingLabel } from '../logic/wifi';
 import { deviceCheckVerdict } from '../logic/deviceCheck';
 import { DEFAULT_FLOOR_HEIGHT_M } from '../logic/venueDraft';
 import { fmt, fmtPct, fmtSigned } from '../logic/numbers';
@@ -13,7 +14,7 @@ import { confirm, notify } from '../ui/confirm';
 type Scope = 'session' | 'all';
 
 export function DataScreen() {
-  const { readings, activeSession, venues, deleteReading, clearReadings, deviceChecks, deleteDeviceCheck } = useAppState();
+  const { readings, activeSession, venues, deleteReading, clearReadings, deviceChecks, deleteDeviceCheck, wifiScans } = useAppState();
   const [scope, setScope] = useState<Scope>(activeSession ? 'session' : 'all');
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +79,21 @@ export function DataScreen() {
     }
   };
 
+  const doExportWifi = async () => {
+    if (wifiScans.length === 0) {
+      notify('Nothing to export', 'No Wi-Fi scans yet. They are recorded with each reading on Android.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await exportWifiScansCsv(wifiScans.slice().sort((a, b) => a.scannedAt.localeCompare(b.scannedAt)));
+    } catch (e) {
+      notify('Export failed', e instanceof Error ? e.message : 'Unknown error.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onDeleteCheck = async (c: DeviceCheck) => {
     const ok = await confirm('Delete device check?', `${c.deviceModel} at ${new Date(c.timestamp).toLocaleString()}`, 'Delete', true);
     if (ok) deleteDeviceCheck(c.id);
@@ -91,7 +107,7 @@ export function DataScreen() {
   const onClear = async () => {
     const ok = await confirm(
       'Delete ALL readings?',
-      `This permanently deletes ${readings.length} reading(s) from this phone. Export first if you need them.`,
+      `This permanently deletes ${readings.length} reading(s)${wifiScans.length ? ` and ${wifiScans.length} Wi-Fi scan(s)` : ''} from this phone. Export first if you need them.`,
       'Delete all',
       true,
     );
@@ -159,8 +175,20 @@ export function DataScreen() {
           busy={busy}
           disabled={deviceChecks.length === 0}
         />
+        {wifiScans.length > 0 || Platform.OS === 'android' ? (
+          <>
+            <View style={{ height: space.sm }} />
+            <Button
+              title={`Export Wi-Fi scans (${wifiScans.length})`}
+              variant="secondary"
+              onPress={() => void doExportWifi()}
+              busy={busy}
+              disabled={wifiScans.length === 0}
+            />
+          </>
+        ) : null}
         <View style={{ height: space.sm }} />
-        <Muted>Readings and device checks are separate files; share both with the team.</Muted>
+        <Muted>Readings, device checks and Wi-Fi scans are separate files; share all of them with the team.</Muted>
       </Card>
 
       <Card>
@@ -178,7 +206,7 @@ export function DataScreen() {
 
       {readings.length > 0 ? (
         <View style={{ marginTop: space.lg }}>
-          <Banner tone="warn">Clearing deletes every reading from every session on this phone.</Banner>
+          <Banner tone="warn">Clearing deletes every reading (and Wi-Fi scan) from every session on this phone.</Banner>
           <Button title="Clear all readings" variant="danger" onPress={() => void onClear()} />
         </View>
       ) : null}
@@ -233,6 +261,7 @@ function ReadingRow({ r, onDelete }: { r: Reading; onDelete: () => void }) {
         </Text>
         <Muted>
           {new Date(r.timestamp).toLocaleString()} · {r.venueName} · {Math.round(r.secondsSinceCalibration / 60)} min after calibration
+          {wifiReadingLabel(r.wifiScanStatus, r.wifiApCount) ? ` · ${wifiReadingLabel(r.wifiScanStatus, r.wifiApCount)}` : ''}
           {r.notes ? ` · ${r.notes}` : ''}
         </Muted>
       </View>

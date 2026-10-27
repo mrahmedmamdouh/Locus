@@ -9,20 +9,23 @@ import {
   csvToReadings,
   driftByMinutes,
   floorHeightFor,
+  csvToWifiScans,
   isDeviceCheckCsv,
+  isWifiScanCsv,
 } from '@locus/altitude-core';
-import type { AltitudeSource, DeviceCheck, Reading } from '@locus/altitude-core';
+import type { AltitudeSource, DeviceCheck, Reading, WifiScan } from '@locus/altitude-core';
 
 /* ------------------------------------------------------------------ */
 /* Loading and merging                                                 */
 /* ------------------------------------------------------------------ */
 
-/** What a loaded CSV contains: field readings or device capability checks. */
-export type FileKind = 'readings' | 'device-checks';
+/** What a loaded CSV contains: field readings, device capability checks or Wi-Fi scans. */
+export type FileKind = 'readings' | 'device-checks' | 'wifi-scans';
 
 export const FILE_KIND_LABEL: Record<FileKind, string> = {
   readings: 'Readings',
   'device-checks': 'Device checks',
+  'wifi-scans': 'Wi-Fi scans',
 };
 
 export interface FileReport {
@@ -30,7 +33,7 @@ export interface FileReport {
   name: string;
   /** Which kind of export this file was detected as. */
   kind: FileKind;
-  /** Rows parsed successfully. */
+  /** Rows parsed successfully (for Wi-Fi scan files: scans, i.e. distinct reading ids). */
   parsed: number;
   /** Parsed rows actually added (not duplicates of an already-loaded id). */
   added: number;
@@ -45,10 +48,12 @@ export interface FileReport {
 export interface Dataset {
   readings: Reading[];
   deviceChecks: DeviceCheck[];
+  /** Wi-Fi scans, one per reading (joined to readings by readingId). */
+  wifiScans: WifiScan[];
   files: FileReport[];
 }
 
-export const EMPTY_DATASET: Dataset = { readings: [], deviceChecks: [], files: [] };
+export const EMPTY_DATASET: Dataset = { readings: [], deviceChecks: [], wifiScans: [], files: [] };
 
 /**
  * Merge new rows into an existing list, de-duplicating by id.
@@ -94,6 +99,18 @@ export function mergeDeviceChecks(
 ): { deviceChecks: DeviceCheck[]; added: number; duplicates: number } {
   const m = mergeById(existing, incoming);
   return { deviceChecks: m.items, added: m.added, duplicates: m.duplicates };
+}
+
+/** Merge Wi-Fi scans by reading id (one scan per reading; first occurrence wins). */
+export function mergeWifiScans(
+  existing: readonly WifiScan[],
+  incoming: readonly WifiScan[],
+): { wifiScans: WifiScan[]; added: number; duplicates: number } {
+  const m = mergeById(
+    existing.map((s) => ({ id: s.readingId, s })),
+    incoming.map((s) => ({ id: s.readingId, s })),
+  );
+  return { wifiScans: m.items.map((x) => x.s), added: m.added, duplicates: m.duplicates };
 }
 
 /** Add one parsed source (a CSV file or the synthetic sample) to a dataset. */
@@ -150,9 +167,37 @@ export function addDeviceCheckSource(
   };
 }
 
-/** Which kind of export a CSV is, from its header row. */
+/** Add one parsed Wi-Fi scan source (a CSV file or the synthetic sample) to a dataset. */
+export function addWifiScanSource(
+  dataset: Dataset,
+  name: string,
+  incoming: readonly WifiScan[],
+  errors: readonly string[],
+  synthetic = false,
+): Dataset {
+  const merged = mergeWifiScans(dataset.wifiScans, incoming);
+  return {
+    ...dataset,
+    wifiScans: merged.wifiScans,
+    files: [
+      ...dataset.files,
+      {
+        name,
+        kind: 'wifi-scans',
+        parsed: incoming.length,
+        added: merged.added,
+        duplicates: merged.duplicates,
+        errors: [...errors],
+        synthetic,
+      },
+    ],
+  };
+}
+
+/** Which kind of export a CSV is, from its header row. Wi-Fi scans are checked first. */
 export function detectFileKind(text: string): FileKind {
   try {
+    if (isWifiScanCsv(text)) return 'wifi-scans';
     return isDeviceCheckCsv(text) ? 'device-checks' : 'readings';
   } catch {
     return 'readings';
@@ -167,7 +212,17 @@ const parseFailure = (err: unknown) => `Could not parse file: ${err instanceof E
  * land in the file report.
  */
 export function addCsvText(dataset: Dataset, name: string, text: string): Dataset {
-  if (detectFileKind(text) === 'device-checks') {
+  const kind = detectFileKind(text);
+  if (kind === 'wifi-scans') {
+    let result: { scans: WifiScan[]; errors: string[] };
+    try {
+      result = csvToWifiScans(text);
+    } catch (err) {
+      result = { scans: [], errors: [parseFailure(err)] };
+    }
+    return addWifiScanSource(dataset, name, result.scans, result.errors);
+  }
+  if (kind === 'device-checks') {
     let result: { checks: DeviceCheck[]; errors: string[] };
     try {
       result = csvToDeviceChecks(text);
@@ -213,6 +268,21 @@ export function applyExclusions<T extends WithNotes>(readings: readonly T[], opt
   return readings.filter(
     (r) => !(opts.excludeDemo && isDemoRow(r)) && !(opts.excludeSynthetic && isSyntheticRow(r)),
   );
+}
+
+/**
+ * Wi-Fi scans carry no notes, so the DEMO / synthetic exclusion is applied by
+ * joining to readings: a scan is dropped when its reading is loaded and
+ * excluded. Scans whose reading is not loaded are kept (nothing to judge by).
+ */
+export function applyScanExclusions(
+  scans: readonly WifiScan[],
+  readings: readonly Reading[],
+  opts: ExclusionOptions,
+): WifiScan[] {
+  const kept = new Set(applyExclusions(readings, opts).map((r) => r.id));
+  const excluded = new Set(readings.filter((r) => !kept.has(r.id)).map((r) => r.id));
+  return scans.filter((s) => !excluded.has(s.readingId));
 }
 
 /* ------------------------------------------------------------------ */

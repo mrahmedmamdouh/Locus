@@ -7,3 +7,4 @@ export * from './csv';
 export * from './stats';
 export * from './sample';
 export * from './device';
+export * from './wifi';

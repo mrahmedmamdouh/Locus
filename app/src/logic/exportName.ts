@@ -21,3 +21,8 @@ export function csvFileName(venueOrAll: string, date: Date): string {
 export function deviceChecksFileName(date: Date): string {
   return `locus-device-checks-${localDateStamp(date)}.csv`;
 }
+
+/** locus-wifi-scans-<YYYY-MM-DD>.csv */
+export function wifiScansFileName(date: Date): string {
+  return `locus-wifi-scans-${localDateStamp(date)}.csv`;
+}

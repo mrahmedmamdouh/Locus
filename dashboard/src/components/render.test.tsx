@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import { generateSampleReadings } from '@locus/altitude-core';
+import { generateSampleReadings, generateSampleWifiScans } from '@locus/altitude-core';
 import { App } from '../App';
 import { analyze } from '../lib/analysis';
 import { DEFAULT_SETTINGS } from '../lib/settings';
@@ -11,6 +11,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { SourceComparison } from './SourceComparison';
 import { SensorCoverage } from './SensorCoverage';
 import { generateSampleDeviceChecks } from '../lib/coverage';
+import { WifiFloorTest } from './WifiFloorTest';
 
 // Smoke tests: components render with real analysis output (no DOM needed).
 describe('render smoke tests', () => {
@@ -121,6 +122,43 @@ describe('render smoke tests', () => {
     const html = renderToString(
       <SensorCoverage checks={[{ ...c!, deviceModel: '<img src=x onerror=alert(1)>' }]} readings={[]} />,
     );
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;img');
+  });
+
+  it('Wi-Fi floor test shows a hint without scans', () => {
+    expect(renderToString(<WifiFloorTest scans={[]} readings={readings} />)).toContain('Android builds of the app export Wi-Fi scans');
+    expect(renderToString(<App />)).toContain('Android builds of the app export Wi-Fi scans');
+  });
+
+  it('Wi-Fi floor test renders headline, holdout, tables and confidence view', () => {
+    const rs = generateSampleReadings();
+    const scans = generateSampleWifiScans(rs);
+    const html = renderToString(<WifiFloorTest scans={scans} readings={rs} synthetic />).replace(/<!-- -->/g, '');
+    expect(html).toContain('Wi-Fi alone picked the right floor in 99.6% of 240 readings');
+    expect(html).toContain('Barometer on the same readings: 98.3%');
+    expect(html).toContain('Phones without a barometer');
+    expect(html).toContain('so the score reflects a new visitor');
+    expect(html).toContain('240 predictions used other sessions; 0 used the time-gap holdout');
+    expect(html).toContain('tag-synthetic');
+    expect(html).toContain('Demo Mall Cairo (synthetic)');
+    expect(html).toContain('True ↓ / Predicted →');
+    expect(html).toContain('Stale (cached results)');
+    expect(html).toContain('Skipped: too few access points');
+    expect(html).toMatch(/keeping 98.3% of readings \(236 of 240\)/);
+    expect(html).toContain('k neighbours');
+    expect(html).not.toContain('Wi-Fi scan throttling');
+  });
+
+  it('Wi-Fi floor test shows the throttling tip and escapes venue ids', () => {
+    const rs = generateSampleReadings();
+    const scans = generateSampleWifiScans(rs).map((s, i) => ({
+      ...s,
+      venueId: '<img src=x onerror=alert(1)>',
+      status: i % 3 === 0 ? ('throttled' as const) : s.status,
+    }));
+    const html = renderToString(<WifiFloorTest scans={scans} readings={[]} />);
+    expect(html).toContain('Wi-Fi scan throttling');
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img');
   });

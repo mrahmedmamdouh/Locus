@@ -31,6 +31,8 @@ export const READING_COLUMNS = [
   'estFloorIndexBaro',
   'estFloorIndexGps',
   'sampleCount',
+  'wifiScanStatus',
+  'wifiApCount',
   'notes',
 ] as const satisfies readonly (keyof Reading)[];
 
@@ -53,10 +55,15 @@ const NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'estFloorIndexBaro',
   'estFloorIndexGps',
   'sampleCount',
+  'wifiApCount',
 ]);
 
 /** Columns added after v0.1; files without them still load (value = null). */
-const OPTIONAL_COLUMNS: ReadonlySet<keyof Reading> = new Set<keyof Reading>(['trueFloorHeightM']);
+const OPTIONAL_COLUMNS: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
+  'trueFloorHeightM',
+  'wifiScanStatus',
+  'wifiApCount',
+]);
 
 /** Characters that make a spreadsheet treat a text cell as a formula. */
 const FORMULA_START = /^[=+\-@\t\r]/;
@@ -174,7 +181,8 @@ export function csvToReadings(text: string): ParseResult {
         }
       } else {
         // Text is kept as written (no trimming); undo the formula-escaping quote.
-        out[col] = unescapeCsvText(cell);
+        // Optional text columns: empty means "not recorded" (null), as when exported.
+        out[col] = OPTIONAL_COLUMNS.has(col) && cell === '' ? null : unescapeCsvText(cell);
       }
     }
     const bad = READING_COLUMNS.filter(

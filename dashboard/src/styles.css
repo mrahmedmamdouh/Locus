@@ -834,3 +834,41 @@ details.data-table[open] > summary {
   color: var(--ink-2);
   word-break: break-word;
 }
+
+/* ---------- Wi-Fi floor test ---------- */
+.wifi-settings {
+  margin-top: 14px;
+}
+.wifi-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+table.confusion td.cell-diag {
+  background: var(--accent-soft);
+  font-weight: 650;
+}
+table.confusion td.cell-off {
+  color: var(--bad-ink);
+  font-weight: 600;
+}
+.stat-list {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.stat-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.stat-list dt {
+  color: var(--ink-2);
+}
+.stat-list dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}

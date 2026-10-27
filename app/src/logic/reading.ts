@@ -6,6 +6,7 @@ import {
   type Floor,
   type Reading,
   type Venue,
+  type WifiScan,
 } from '@locus/altitude-core';
 import { fixForWindow } from './gps';
 import { round, roundOrNull } from './numbers';
@@ -29,6 +30,8 @@ export interface BuildReadingInput {
   platform: string;
   note: string;
   demo: boolean;
+  /** Wi-Fi scan taken during the window (status + cleaned access points); null = none attempted. */
+  wifi: Pick<WifiScan, 'status' | 'aps'> | null;
 }
 
 export function demoNote(note: string, demo: boolean): string {
@@ -104,6 +107,10 @@ export function buildReading(input: BuildReadingInput): Reading {
     estFloorIndexBaro: estBaro ? estBaro.index : null,
     estFloorIndexGps: estGps ? estGps.index : null,
     sampleCount: pressures.length,
+    wifiScanStatus: input.wifi ? input.wifi.status : null,
+    // No count when no scan was attempted (iOS/web, or turned off in Settings).
+    wifiApCount:
+      input.wifi && input.wifi.status !== 'unsupported' && input.wifi.status !== 'skipped' ? input.wifi.aps.length : null,
     notes: demoNote(input.note, input.demo),
   };
 }

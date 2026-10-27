@@ -32,6 +32,8 @@ export function DataLoader({
   included,
   totalChecks = 0,
   includedChecks = 0,
+  totalScans = 0,
+  includedScans = 0,
   exclusion,
   onFiles,
   onSample,
@@ -43,6 +45,8 @@ export function DataLoader({
   included: number;
   totalChecks?: number;
   includedChecks?: number;
+  totalScans?: number;
+  includedScans?: number;
   exclusion: ExclusionOptions;
   onFiles: (files: LoadedFile[]) => void;
   onSample: () => void;
@@ -70,7 +74,7 @@ export function DataLoader({
   return (
     <Card
       title="Load data"
-      subtitle="Readings and device-check CSV exports from the Locus field-test app. Files are read locally and never uploaded."
+      subtitle="Readings, device-check and Wi-Fi scan CSV exports from the Locus field-test app. Files are read locally and never uploaded."
     >
       <label
         htmlFor={inputId}
@@ -87,7 +91,7 @@ export function DataLoader({
         }}
       >
         <strong>{busy ? 'Reading files…' : 'Drop CSV files here or choose files'}</strong>
-        <span className="small muted">Each file is detected as readings or device checks. Multiple files are merged; duplicate ids are skipped.</span>
+        <span className="small muted">Each file is detected as readings, device checks or Wi-Fi scans. Multiple files are merged; duplicate ids are skipped.</span>
         <input
           ref={inputRef}
           id={inputId}
@@ -142,6 +146,13 @@ export function DataLoader({
                 {' '}
                 <strong>{includedChecks.toLocaleString()}</strong>
                 {` of ${totalChecks.toLocaleString()} device checks included in sensor coverage.`}
+              </>
+            ) : null}
+            {totalScans > 0 ? (
+              <>
+                {' '}
+                <strong>{includedScans.toLocaleString()}</strong>
+                {` of ${totalScans.toLocaleString()} Wi-Fi scans included in the Wi-Fi floor test.`}
               </>
             ) : null}
           </p>

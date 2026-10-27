@@ -78,8 +78,13 @@ function input(overrides: Partial<BuildReadingInput> = {}): BuildReadingInput {
     platform: 'android',
     note: ' near escalator ',
     demo: false,
+    wifi: { status: 'ok', aps: [ap('a0:b1:c2:00:00:01', -50), ap('a0:b1:c2:00:00:02', -70)] },
     ...overrides,
   };
+}
+
+function ap(bssid: string, rssiDbm: number) {
+  return { bssid, rssiDbm, frequencyMhz: 2437, rttResponder: null, ageMs: 100 };
 }
 
 describe('buildReading', () => {
@@ -110,6 +115,8 @@ describe('buildReading', () => {
       estFloorIndexBaro: 2,
       estFloorIndexGps: 2,
       sampleCount: 20,
+      wifiScanStatus: 'ok',
+      wifiApCount: 2,
       notes: 'near escalator',
     });
   });
@@ -203,6 +210,19 @@ describe('buildReading', () => {
     expect(r.estFloorIndexBaro).toBe(0);
   });
 
+  it('records the Wi-Fi scan status and access point count', () => {
+    expect(buildReading(input({ wifi: { status: 'throttled', aps: [] } }))).toMatchObject({
+      wifiScanStatus: 'throttled',
+      wifiApCount: 0,
+    });
+    expect(buildReading(input({ wifi: { status: 'unsupported', aps: [] } }))).toMatchObject({
+      wifiScanStatus: 'unsupported',
+      wifiApCount: null,
+    });
+    expect(buildReading(input({ wifi: { status: 'skipped', aps: [] } })).wifiApCount).toBeNull();
+    expect(buildReading(input({ wifi: null }))).toMatchObject({ wifiScanStatus: null, wifiApCount: null });
+  });
+
   it('prefixes DEMO in demo mode', () => {
     expect(buildReading(input({ demo: true })).notes).toBe('DEMO near escalator');
     expect(buildReading(input({ demo: true, note: '' })).notes).toBe('DEMO');
@@ -213,7 +233,7 @@ describe('buildReading', () => {
   });
 
   it('round-trips through the shared CSV schema', () => {
-    const rows = [buildReading(input()), buildReading(input({ id: 'r2', gps: null, demo: true }))];
+    const rows = [buildReading(input()), buildReading(input({ id: 'r2', gps: null, demo: true, wifi: null }))];
     const parsed = csvToReadings(readingsToCsv(rows));
     expect(parsed.errors).toEqual([]);
     expect(parsed.readings).toEqual(rows);

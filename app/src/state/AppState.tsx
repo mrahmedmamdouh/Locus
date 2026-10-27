@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { DeviceCheck, Reading, Venue } from '@locus/altitude-core';
+import type { DeviceCheck, Reading, Venue, WifiScan } from '@locus/altitude-core';
 import type { Session } from '../logic/types';
 import {
   DEFAULT_SETTINGS,
@@ -9,6 +9,7 @@ import {
   saveSessions,
   saveSettings,
   saveVenues,
+  saveWifiScans,
   type Settings,
 } from './storage';
 
@@ -25,9 +26,14 @@ export interface AppStateValue {
   deleteVenue: (id: string) => void;
   upsertSession: (s: Session) => void;
   setActiveSession: (id: string | null) => void;
-  addReading: (r: Reading) => void;
+  /** Add a reading and, if one was taken, its Wi-Fi scan. */
+  addReading: (r: Reading, wifi?: WifiScan | null) => void;
+  /** Deletes the reading and its Wi-Fi scan. */
   deleteReading: (id: string) => void;
+  /** Deletes every reading and every Wi-Fi scan. */
   clearReadings: () => void;
+  /** Wi-Fi scans (Android), one per reading at most, joined by readingId. */
+  wifiScans: WifiScan[];
   updateSettings: (patch: Partial<Settings>) => void;
   /** Device capability checks, oldest first. */
   deviceChecks: DeviceCheck[];
@@ -48,6 +54,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [deviceChecks, setDeviceChecks] = useState<DeviceCheck[]>([]);
+  const [wifiScans, setWifiScans] = useState<WifiScan[]>([]);
   const [recordingInProgress, setRecordingInProgress] = useState(false);
 
   useEffect(() => {
@@ -60,6 +67,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setReadings(s.readings);
         setSettings(s.settings);
         setDeviceChecks(s.deviceChecks);
+        setWifiScans(s.wifiScans);
       })
       .then(() => {
         if (!cancelled) setReady(true);
@@ -92,6 +100,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready) persist(saveDeviceChecks(deviceChecks));
   }, [deviceChecks, ready, persist]);
+  useEffect(() => {
+    if (ready) persist(saveWifiScans(wifiScans));
+  }, [wifiScans, ready, persist]);
 
   const upsert = <T extends { id: string }>(list: T[], item: T) => {
     const i = list.findIndex((x) => x.id === item.id);
@@ -121,9 +132,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       upsertSession: (s) => setSessions((list) => upsert(list, s)),
       setActiveSession: (id) => setSettings((s) => ({ ...s, activeSessionId: id })),
-      addReading: (r) => setReadings((list) => [...list, r]),
-      deleteReading: (id) => setReadings((list) => list.filter((r) => r.id !== id)),
-      clearReadings: () => setReadings([]),
+      addReading: (r, wifi) => {
+        setReadings((list) => [...list, r]);
+        if (wifi) setWifiScans((list) => [...list.filter((w) => w.readingId !== wifi.readingId), wifi]);
+      },
+      deleteReading: (id) => {
+        setReadings((list) => list.filter((r) => r.id !== id));
+        setWifiScans((list) => (list.some((w) => w.readingId === id) ? list.filter((w) => w.readingId !== id) : list));
+      },
+      clearReadings: () => {
+        setReadings([]);
+        setWifiScans([]);
+      },
+      wifiScans,
       updateSettings: (patch) => setSettings((s) => ({ ...s, ...patch })),
       deviceChecks,
       addDeviceCheck: (c) => setDeviceChecks((list) => [...list, c]),
@@ -131,7 +152,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       recordingInProgress,
       setRecordingInProgress,
     };
-  }, [ready, storageError, venues, sessions, readings, settings, deviceChecks, recordingInProgress]);
+  }, [ready, storageError, venues, sessions, readings, settings, deviceChecks, wifiScans, recordingInProgress]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
