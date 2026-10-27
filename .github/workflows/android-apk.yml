@@ -56,7 +56,22 @@ jobs:
 
       - name: Build release APK
         working-directory: app/android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle.log; then
+            # Surface the actual compiler/Gradle errors as annotations, readable
+            # from the API and the run page without opening the full log.
+            grep -E '^e: |error:|What went wrong|Could not|FAILURE' gradle.log \
+              | grep -v '^\s*at ' | head -n 20 \
+              | while IFS= read -r line; do
+                  msg=${line//'%'/'%25'}
+                  echo "::error title=Gradle::${msg}"
+                done
+            summary=$(grep -A6 'What went wrong' gradle.log | head -n 12 | tr '\n' ' ' | sed 's/%/%25/g')
+            [ -n "$summary" ] && echo "::error title=Gradle summary::${summary}"
+            exit 1
+          fi
 
       - name: Name the APK
         id: apk
