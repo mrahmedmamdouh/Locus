@@ -90,8 +90,11 @@ jobs:
           # Minified class names change, but each Expo module's registered name survives.
           strings_in_dex=$(unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$' | while read -r d; do unzip -p "$APK" "$d" | strings -n 5; done)
           missing=0
-          for module in LocusWifi ExpoBarometer; do
-            if ! grep -qx "$module" <<<"$strings_in_dex"; then
+          # Each dex string is preceded by its length byte, which `strings` may keep
+          # when it is printable (9 = tab), so allow leading whitespace.
+          # 'rttResponder' is a result key only the Wi-Fi module's Kotlin code contains.
+          for module in LocusWifi ExpoBarometer rttResponder; do
+            if ! grep -qE "(^|[[:space:]])${module}\$" <<<"$strings_in_dex"; then
               echo "::error title=Missing native module::$module is not in the APK (check autolinking and that its android/ sources are committed)"
               missing=1
             fi
