@@ -83,6 +83,21 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           ls -la "$name"
 
+      - name: Check native modules are inside the APK
+        env:
+          APK: ${{ steps.apk.outputs.name }}
+        run: |
+          # Minified class names change, but each Expo module's registered name survives.
+          strings_in_dex=$(unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$' | while read -r d; do unzip -p "$APK" "$d" | strings -n 5; done)
+          missing=0
+          for module in LocusWifi ExpoBarometer; do
+            if ! grep -qx "$module" <<<"$strings_in_dex"; then
+              echo "::error title=Missing native module::$module is not in the APK (check autolinking and that its android/ sources are committed)"
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
