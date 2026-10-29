@@ -8,28 +8,64 @@ An iPhone only installs apps signed with an Apple Developer account, so iOS buil
 | --- | --- | --- |
 | [Apple Developer Program](https://developer.apple.com/programs/enroll/) | USD 99 / year | Individual enrollment is fastest. A company needs a D-U-N-S number and takes longer. |
 | [Expo account](https://expo.dev/signup) | Free | The free plan includes a limited number of low-priority cloud builds each month. |
-| Node.js 20+ on any computer | Free | Windows, macOS or Linux. |
+| Node.js 22.13+ on any computer | Free | Windows, macOS or Linux; no Mac or Xcode needed. |
 
-## One-time setup (about 30 minutes once Apple approves your membership)
+## One-time setup (done once on 2026-10-29; repeat only for a new Mac or a new key)
 
-1. **Create the app in App Store Connect.** In [App Store Connect](https://appstoreconnect.apple.com) → Apps → **+** → New App: platform iOS, name "Locus Field", bundle ID `com.locus.field` (register it under Certificates, Identifiers & Profiles → Identifiers if it is not in the list), SKU `locus-field`. If Apple says the bundle ID is taken, pick another (for example `com.<yourname>.locus`), and change `ios.bundleIdentifier` in `app/app.json` to match.
-2. **Get the code and install:**
+Already done for this repo: the app record in App Store Connect (`com.locus.field`, Apple app ID `6827325977`, set as `ascAppId` in `app/eas.json`) and the Expo project `@evolvetech-venture/locus-field` (ID in `app/app.json`).
+
+1. **Tools:** Node.js **22.13 or newer** (Expo SDK 58 requires it; v26 works) and Git.
+2. **Get the code:**
    ```bash
    git clone https://github.com/mrahmedmamdouh/Locus.git
    cd Locus && npm ci && cd app
+   npx eas-cli@latest login        # Expo account with access to evolvetech-venture
    ```
-3. **Link the app to Expo:**
+3. **Create an App Store Connect API key** (used instead of an Apple ID password, which `eas` often cannot log in with):
+   App Store Connect → Users and Access → Integrations → App Store Connect API → **Team Keys** → **+**, name `Locus EAS`, access **Admin** → Generate → **Download** the `AuthKey_<KEYID>.p8` file (only once). Note the **Key ID** and the **Issuer ID**. Your **Team ID** is under developer.apple.com → Account → Membership details. Keep the key outside the repo:
    ```bash
-   npx eas-cli@26.0.0 login
-   npx eas-cli@26.0.0 init
+   mkdir -p ~/.appstoreconnect/private_keys
+   mv ~/Downloads/AuthKey_*.p8 ~/.appstoreconnect/private_keys/
    ```
-   `init` adds `extra.eas.projectId` to `app/app.json`. Commit and push that change (or send the project ID and it can be added for you).
-4. **First iOS build, interactive:**
-   ```bash
-   npx eas-cli@26.0.0 build --platform ios --profile production --auto-submit
-   ```
-   Answer **yes** to logging in to your Apple account and letting EAS create the distribution certificate and provisioning profile. When asked about an App Store Connect API key for submissions, let EAS create one. The build takes about 15–30 minutes on the free plan's queue, then it is uploaded to TestFlight. Apple then needs 5–15 minutes to process it.
-5. **Let GitHub run future builds:** at [expo.dev](https://expo.dev) → Account settings → Access tokens, create a token. In GitHub → the repo → Settings → Secrets and variables → Actions, add it as `EXPO_TOKEN`.
+   `*.p8` files are git-ignored, but never paste a key's contents anywhere.
+
+## Build and send a new version to TestFlight
+
+In one Terminal window (the exports last only for that window):
+
+```bash
+export EXPO_ASC_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8"
+export EXPO_ASC_KEY_ID="<KEYID>"
+export EXPO_ASC_ISSUER_ID="<ISSUER-ID>"
+export EXPO_APPLE_TEAM_ID="<TEAMID>"
+export EXPO_APPLE_TEAM_TYPE="COMPANY_OR_ORGANIZATION"
+
+cd ~/Locus && git pull && cd app
+npx eas-cli@latest build --platform ios --profile production
+```
+
+The build takes 15–30 minutes on Expo's free queue (watch the link it prints). The "expo doctor" warning in the build log does not stop the build. When it shows **Finished**, submit it with the local key:
+
+```bash
+node -e '
+const fs=require("fs"),e=process.env,f="eas.json";
+if(!e.EXPO_ASC_API_KEY_PATH||!e.EXPO_ASC_KEY_ID||!e.EXPO_ASC_ISSUER_ID){console.error("Missing EXPO_ASC_* values");process.exit(1)}
+const j=JSON.parse(fs.readFileSync(f));
+Object.assign(j.submit.production.ios,{ascApiKeyPath:e.EXPO_ASC_API_KEY_PATH,ascApiKeyId:e.EXPO_ASC_KEY_ID,ascApiKeyIssuerId:e.EXPO_ASC_ISSUER_ID});
+fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n");'
+npx eas-cli@latest submit --platform ios --latest
+git checkout -- eas.json          # never commit the local key path
+```
+
+Apple then processes the build for 10–30 minutes before it appears in TestFlight.
+
+**Troubleshooting**
+
+| Message | Fix |
+| --- | --- |
+| `Invalid username and password combination` | Use the API key route above instead of the Apple ID login. |
+| `Ensuring your app exists on App Store Connect… Apple ID:` | `ascAppId` is missing from `app/eas.json` (it is set to `6827325977`). Press Ctrl+C; the build continues. |
+| `App Store Connect rejected the API authentication credentials` on submit | The key stored on Expo's servers is wrong. Submit with the local key as above, or fix it in `npx eas-cli@latest credentials -p ios` → production → App Store Connect API Key. |
 
 ## Install on your iPhone
 
@@ -39,7 +75,7 @@ An iPhone only installs apps signed with an Apple Developer account, so iOS buil
 
 ## New versions
 
-GitHub → Actions → **iOS build to TestFlight** → Run workflow. Build numbers increase automatically (`appVersionSource: remote` in `app/eas.json`). Testers get the update in TestFlight.
+Build numbers increase automatically (`appVersionSource: remote` in `app/eas.json`), and testers get the update in TestFlight. Use the commands above. The GitHub workflow **iOS build to TestFlight** also works once the repository secret `EXPO_TOKEN` is set *and* a working submission key is stored on Expo's servers (see Troubleshooting).
 
 ## Testers outside your team
 
