@@ -14,3 +14,8 @@ web-build/
 .env.*
 !.env.example
 *.tsbuildinfo
+
+# Apple / signing secrets: never commit
+*.p8
+*.p12
+*.mobileprovision
