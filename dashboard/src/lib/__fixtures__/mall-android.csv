@@ -1,0 +1,4 @@
+id,sessionId,venueId,venueName,deviceModel,platform,timestamp,secondsSinceCalibration,trueFloorLabel,trueFloorIndex,trueFloorCenterM,trueFloorHeightM,pressureHpa,baselinePressureHpa,temperatureC,baroRelAltM,osRelAltM,gpsLat,gpsLon,gpsAltM,gpsAccuracyM,gpsAltAccuracyM,gpsRelAltM,estFloorIndexBaro,estFloorIndexGps,sampleCount,wifiScanStatus,wifiApCount,notes
+rmvwmwpwl77v7zc,smvwmv8x56chejj,vmvwmu9g2j9m6mu,Mall of Oman,SM-A725F,android,2026-10-31T16:47:38.277Z,68.7,G,0,0,4.5,,,24,,,,,,,,,,,0,ok,63,At entrance A1
+rmvwn19nzp8f1dq,smvwmv8x56chejj,vmvwmu9g2j9m6mu,Mall of Oman,SM-A725F,android,2026-10-31T16:51:10.511Z,280.9,G,0,0,4.5,,,24,,,,,,,,,,,0,ok,87,A&H
+rmvwn1w5pzcxxz4,smvwmv8x56chejj,vmvwmu9g2j9m6mu,Mall of Oman,SM-A725F,android,2026-10-31T16:51:39.661Z,310.1,G,0,0,4.5,,,24,,,,,,,,,,,0,ok,89,A&H

@@ -1,0 +1,4 @@
+id,sessionId,venueId,venueName,deviceModel,platform,timestamp,secondsSinceCalibration,trueFloorLabel,trueFloorIndex,trueFloorCenterM,trueFloorHeightM,pressureHpa,baselinePressureHpa,temperatureC,baroRelAltM,osRelAltM,gpsLat,gpsLon,gpsAltM,gpsAccuracyM,gpsAltAccuracyM,gpsRelAltM,estFloorIndexBaro,estFloorIndexGps,sampleCount,wifiScanStatus,wifiApCount,notes
+rmvwmwq6xpyj1rz,smvwmv8gcciqbqf,vmvwmun5it4lb2z,Mall Of Oman,iPhone 15 Pro,ios,2026-10-31T16:47:38.649Z,69.6,G,0,0,4.5,1013.4285,1013.4113,24,-0.148,-0.143,,,,,,,0,,5,unsupported,,At Entrance A1
+rmvwn1c6wuy16sg,smvwmv8gcciqbqf,vmvwmun5it4lb2z,Mall Of Oman,iPhone 15 Pro,ios,2026-10-31T16:51:13.784Z,284.8,G,0,0,4.5,1013.4407,1013.4113,24,-0.252,-0.244,,,,,,,0,,6,unsupported,,A&H
+rmvwn1yhzm25161,smvwmv8gcciqbqf,vmvwmun5it4lb2z,Mall Of Oman,iPhone 15 Pro,ios,2026-10-31T16:51:42.695Z,313.7,G,0,0,4.5,1013.449,1013.4113,24,-0.324,-0.314,,,,,,,0,,6,unsupported,,A&H

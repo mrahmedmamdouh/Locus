@@ -113,6 +113,28 @@ export function mergeWifiScans(
   return { wifiScans: m.items.map((x) => x.s), added: m.added, duplicates: m.duplicates };
 }
 
+/**
+ * One venue id per mall across phones. Each phone gives a venue its own random
+ * id, so the same mall recorded on two phones would count as two venues (and
+ * inflate the gate's venue count). Readings carry the venue's name, so venues
+ * are keyed by the name, ignoring case and extra spaces.
+ */
+export function canonicalVenueId(venueName: string, fallbackId: string): string {
+  const key = venueName.trim().replace(/\s+/g, ' ').toLowerCase();
+  return key ? `venue:${key}` : fallbackId;
+}
+
+/** Give readings canonical venue ids; returns them and the phone-id → canonical-id map. */
+export function unifyReadingVenues(readings: readonly Reading[]): { readings: Reading[]; idMap: Map<string, string> } {
+  const idMap = new Map<string, string>();
+  const out = readings.map((r) => {
+    const id = canonicalVenueId(r.venueName, r.venueId);
+    if (id !== r.venueId) idMap.set(r.venueId, id);
+    return id === r.venueId ? r : { ...r, venueId: id };
+  });
+  return { readings: out, idMap };
+}
+
 /** Add one parsed source (a CSV file or the synthetic sample) to a dataset. */
 export function addSource(
   dataset: Dataset,
@@ -121,9 +143,16 @@ export function addSource(
   errors: readonly string[],
   synthetic = false,
 ): Dataset {
-  const merged = mergeReadings(dataset.readings, incoming);
+  const unified = unifyReadingVenues(incoming);
+  const merged = mergeReadings(dataset.readings, unified.readings);
+  // Wi-Fi scans loaded before these readings still carry the phone's venue id.
+  const wifiScans = dataset.wifiScans.map((s) => {
+    const id = unified.idMap.get(s.venueId);
+    return id ? { ...s, venueId: id } : s;
+  });
   return {
     ...dataset,
+    wifiScans,
     readings: merged.readings,
     files: [
       ...dataset.files,
@@ -175,7 +204,13 @@ export function addWifiScanSource(
   errors: readonly string[],
   synthetic = false,
 ): Dataset {
-  const merged = mergeWifiScans(dataset.wifiScans, incoming);
+  // Use the venue of the matching reading (already canonical) when it is loaded.
+  const venueOfReading = new Map(dataset.readings.map((r) => [r.id, r.venueId] as const));
+  const unified = incoming.map((s) => {
+    const id = venueOfReading.get(s.readingId);
+    return id && id !== s.venueId ? { ...s, venueId: id } : s;
+  });
+  const merged = mergeWifiScans(dataset.wifiScans, unified);
   return {
     ...dataset,
     wifiScans: merged.wifiScans,
