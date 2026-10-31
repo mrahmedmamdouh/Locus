@@ -128,3 +128,29 @@ describe('Wi-Fi floor classifier', () => {
     expect(evaluateWifiFloors([fresh]).skipped.tooFewAps).toBe(1);
   });
 });
+
+describe('Wi-Fi holdout choice', () => {
+  it('ignores a tiny extra session (one reading after recalibrating) and uses the time holdout', () => {
+    const readings = generateSampleReadings(42, 12);
+    const scans = generateSampleWifiScans(readings);
+    const main = scans.filter((s) => s.sessionId === scans[0]!.sessionId);
+    const extra = { ...main[0]!, readingId: 'after-recal', sessionId: 'tiny', scannedAt: '2026-10-27T13:00:00.000Z' };
+    const ev = evaluateWifiFloors([...main, extra]);
+    expect(ev.predictions.every((p) => p.holdout === 'time')).toBe(true);
+    expect(ev.skipped.noTrainingData).toBe(0);
+    expect(ev.evaluated).toBe(main.length + 1);
+  });
+});
+
+describe('Wi-Fi majority baseline', () => {
+  it('reports what always guessing the most common floor would score', () => {
+    const mk = (id: string, floor: number, t: number): WifiScan => ({
+      readingId: id, sessionId: 's', venueId: 'v', trueFloorIndex: floor,
+      scannedAt: new Date(Date.UTC(2026, 9, 31, 17, t)).toISOString(), status: 'ok',
+      aps: [ap('a4:00:00:00:00:01', -50), ap('a4:00:00:00:00:02', -60), ap('a4:00:00:00:00:03', -70)],
+    });
+    const ev = evaluateWifiFloors([mk('a', 2, 0), mk('b', 2, 10), mk('c', 2, 20), mk('d', 1, 30)]);
+    expect(ev.evaluated).toBe(4);
+    expect(ev.majorityBaseline).toBe(0.75);
+  });
+});

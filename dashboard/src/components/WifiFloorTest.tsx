@@ -156,6 +156,12 @@ export function WifiFloorTest({
         </strong>
         <span className="muted"> · Barometer on the same readings: {fmtPct(overall.baroAccuracy, 1)}</span>
       </p>
+      {overall.majorityBaseline !== null ? (
+        <p className="small">
+          For comparison, always guessing the most common floor would score {fmtPct(overall.majorityBaseline, 1)} on
+          the same readings. Wi-Fi is only useful by the margin it beats that.
+        </p>
+      ) : null}
 
       <div className="kpis">
         <Headline

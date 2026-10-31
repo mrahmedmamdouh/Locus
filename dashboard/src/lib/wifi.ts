@@ -61,7 +61,7 @@ export interface WifiVenueRow {
 export interface WifiAnalysis {
   evaluation: WifiEvaluation;
   /** All evaluated readings. */
-  overall: { n: number; wifiAccuracy: number | null; baroAccuracy: number | null };
+  overall: { n: number; wifiAccuracy: number | null; baroAccuracy: number | null; majorityBaseline: number | null };
   /** Evaluated readings from phones without a barometer (baroRelAltM is null). */
   noBarometer: { n: number; wifiAccuracy: number | null };
   holdout: { session: number; time: number };
@@ -87,7 +87,7 @@ export function analyzeWifi(scans: WifiScan[], readings: Reading[], settings: Wi
 
   return {
     evaluation,
-    overall: { n: ps.length, wifiAccuracy: evaluation.accuracy, baroAccuracy: barometerAccuracyOn(readings, ps) },
+    overall: { n: ps.length, wifiAccuracy: evaluation.accuracy, baroAccuracy: barometerAccuracyOn(readings, ps), majorityBaseline: evaluation.majorityBaseline },
     noBarometer: { n: noBaroPs.length, wifiAccuracy: predictionAccuracy(noBaroPs) },
     holdout: {
       session: ps.filter((p) => p.holdout === 'session').length,

@@ -195,6 +195,12 @@ export interface FingerprintOptions {
    * of the test reading are excluded from training (same spot, near-duplicate).
    */
   sameSpotSeconds: number;
+  /**
+   * A session only counts towards the "other sessions" holdout if it has at
+   * least this many usable fingerprints on at least two floors. A short
+   * session (e.g. one reading after a recalibration) is not a separate visit.
+   */
+  minSessionFingerprints: number;
 }
 
 export const DEFAULT_FINGERPRINT_OPTIONS: FingerprintOptions = {
@@ -203,6 +209,7 @@ export const DEFAULT_FINGERPRINT_OPTIONS: FingerprintOptions = {
   k: 3,
   missingRssiDbm: -100,
   sameSpotSeconds: 120,
+  minSessionFingerprints: 10,
 };
 
 interface Fingerprint {
@@ -268,14 +275,20 @@ export interface WifiEvaluation {
   skipped: { notOk: number; tooFewAps: number; noTrainingData: number };
   evaluated: number;
   accuracy: number | null;
+  /**
+   * Accuracy of always guessing each venue's most common true floor, on the
+   * same readings. Wi-Fi is only useful by the margin it beats this.
+   */
+  majorityBaseline: number | null;
   byVenue: { venueId: string; evaluated: number; accuracy: number | null }[];
 }
 
 /**
  * Leave-out evaluation of a k-nearest-neighbour Wi-Fi floor classifier, per venue.
- * If a venue has two or more sessions, each reading is predicted from the OTHER
- * sessions only (closest to real use: a new visitor). With one session, readings
- * within `sameSpotSeconds` of the test reading are excluded instead.
+ * If a venue has two or more full sessions (see `minSessionFingerprints`), each
+ * reading is predicted from the OTHER sessions only (closest to real use: a new
+ * visitor). Otherwise readings within `sameSpotSeconds` of the test reading are
+ * excluded instead.
  */
 export function evaluateWifiFloors(
   scans: WifiScan[],
@@ -298,7 +311,13 @@ export function evaluateWifiFloors(
 
   const predictions: WifiPrediction[] = [];
   for (const [, venueFps] of byVenue) {
-    const multiSession = new Set(venueFps.map((f) => f.sessionId)).size >= 2;
+    // Session holdout only when at least two sessions are real visits on their own.
+    const bySession = new Map<string, Fingerprint[]>();
+    for (const f of venueFps) bySession.set(f.sessionId, [...(bySession.get(f.sessionId) ?? []), f]);
+    const fullSessions = [...bySession.values()].filter(
+      (fs) => fs.length >= opts.minSessionFingerprints && new Set(fs.map((f) => f.trueFloorIndex)).size >= 2,
+    );
+    const multiSession = fullSessions.length >= 2;
     for (const test of venueFps) {
       const train = venueFps.filter((f) =>
         f === test
@@ -345,11 +364,18 @@ export function evaluateWifiFloors(
   const acc = (ps: WifiPrediction[]) =>
     ps.length ? ps.filter((p) => p.predictedFloorIndex === p.trueFloorIndex).length / ps.length : null;
   const venues = [...new Set(predictions.map((p) => p.venueId))].sort();
+  let majorityHits = 0;
+  for (const venueId of new Set(predictions.map((p) => p.venueId))) {
+    const counts = new Map<number, number>();
+    for (const p of predictions) if (p.venueId === venueId) counts.set(p.trueFloorIndex, (counts.get(p.trueFloorIndex) ?? 0) + 1);
+    majorityHits += Math.max(...counts.values());
+  }
   return {
     predictions,
     skipped,
     evaluated: predictions.length,
     accuracy: acc(predictions),
+    majorityBaseline: predictions.length ? majorityHits / predictions.length : null,
     byVenue: venues.map((venueId) => {
       const ps = predictions.filter((p) => p.venueId === venueId);
       return { venueId, evaluated: ps.length, accuracy: acc(ps) };
