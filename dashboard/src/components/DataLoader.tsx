@@ -169,6 +169,11 @@ export function DataLoader({
                   {f.duplicates ? ` · ${f.duplicates.toLocaleString()} duplicate ids skipped` : ''}
                   {f.errors.length ? ` · ${f.errors.length.toLocaleString()} problem(s)` : ''}
                 </div>
+                {f.venueMerges?.length ? (
+                  <div className="small muted" data-testid="venue-merges">
+                    {`Merged venue names: ${f.venueMerges.map((m) => `'${m.from}' → '${m.to}'`).join(', ')}`}
+                  </div>
+                ) : null}
                 {f.errors.length > 0 ? (
                   <details>
                     <summary>Show parse problems</summary>

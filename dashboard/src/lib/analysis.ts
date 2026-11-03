@@ -2,7 +2,7 @@
  * One pure entry point that turns readings + settings into everything the
  * dashboard renders. Components stay thin: they only display this result.
  */
-import { driftByMinutes, evaluateGate, summarize, summarizeBy } from '@locus/altitude-core';
+import { driftByMinutes, evaluateGate, floorHeightFor, summarize, summarizeBy } from '@locus/altitude-core';
 import type { AccuracySummary, AltitudeSource, GateResult, Reading } from '@locus/altitude-core';
 import { countFallbackFloorHeight, isSyntheticRow, recalibrationAdvice, type DriftRow, type RecalibrationAdvice } from './data';
 import type { Settings } from './settings';
@@ -30,6 +30,11 @@ export interface Analysis {
   syntheticRows: number;
   /** Readings without their own floor height, judged against the fallback floor height. */
   fallbackFloorRows: number;
+  /**
+   * Median floor height the readings are judged against (their own height,
+   * else the fallback): the "half a floor" reference for charts and drift advice.
+   */
+  typicalFloorHeightM: number;
   gate: GateResult;
   bySource: AccuracySummary[];
   breakdowns: Record<BreakdownKey, BreakdownRow[]>;
@@ -59,6 +64,14 @@ export function driftBucketFor(readings: readonly Reading[]): number {
   return 30;
 }
 
+/** Median of each reading's floor height (`floorHeightFor`), or the fallback when there are no readings. */
+export function typicalFloorHeight(readings: readonly Reading[], fallbackM: number): number {
+  if (readings.length === 0) return fallbackM;
+  const hs = readings.map((r) => floorHeightFor(r, fallbackM)).sort((a, b) => a - b);
+  const mid = Math.floor(hs.length / 2);
+  return hs.length % 2 ? hs[mid]! : (hs[mid - 1]! + hs[mid]!) / 2;
+}
+
 export function analyze(readings: Reading[], settings: Settings): Analysis {
   const { floorHeightM, source, gate: criteria } = settings;
   const breakdownSource = source;
@@ -71,6 +84,7 @@ export function analyze(readings: Reading[], settings: Settings): Analysis {
 
   const driftBucketMinutes = driftBucketFor(readings);
   const drift = driftByMinutes(readings, 'baro', driftBucketMinutes);
+  const typicalFloorHeightM = typicalFloorHeight(readings, floorHeightM);
 
   return {
     total: readings.length,
@@ -78,6 +92,7 @@ export function analyze(readings: Reading[], settings: Settings): Analysis {
     devices: new Set(readings.map((r) => r.deviceModel)).size,
     syntheticRows: readings.filter(isSyntheticRow).length,
     fallbackFloorRows: countFallbackFloorHeight(readings),
+    typicalFloorHeightM,
     gate: evaluateGate(readings, floorHeightM, source, criteria),
     bySource: SOURCES.map((s) => summarize(readings, s, floorHeightM)),
     breakdowns: {
@@ -91,6 +106,6 @@ export function analyze(readings: Reading[], settings: Settings): Analysis {
     },
     drift,
     driftBucketMinutes,
-    advice: recalibrationAdvice(drift, floorHeightM),
+    advice: recalibrationAdvice(drift, typicalFloorHeightM),
   };
 }

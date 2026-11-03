@@ -43,6 +43,8 @@ export interface FileReport {
   errors: string[];
   /** True for generated demo data. */
   synthetic: boolean;
+  /** Venue names in this file merged into a loaded venue with a near-identical name (typos). */
+  venueMerges?: VenueMerge[];
 }
 
 export interface Dataset {
@@ -113,6 +115,11 @@ export function mergeWifiScans(
   return { wifiScans: m.items.map((x) => x.s), added: m.added, duplicates: m.duplicates };
 }
 
+/** A venue name as compared across phones: trimmed, single-spaced, lower case. */
+export function normalizeVenueName(venueName: string): string {
+  return venueName.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 /**
  * One venue id per mall across phones. Each phone gives a venue its own random
  * id, so the same mall recorded on two phones would count as two venues (and
@@ -120,19 +127,98 @@ export function mergeWifiScans(
  * are keyed by the name, ignoring case and extra spaces.
  */
 export function canonicalVenueId(venueName: string, fallbackId: string): string {
-  const key = venueName.trim().replace(/\s+/g, ' ').toLowerCase();
+  const key = normalizeVenueName(venueName);
   return key ? `venue:${key}` : fallbackId;
 }
 
-/** Give readings canonical venue ids; returns them and the phone-id → canonical-id map. */
-export function unifyReadingVenues(readings: readonly Reading[]): { readings: Reading[]; idMap: Map<string, string> } {
+/** Edit distance (insertions, deletions, substitutions) between two strings. */
+export function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length]!;
+}
+
+/** Typo tolerance for venue names: max edit distance and min name length. */
+export const VENUE_NAME_MAX_DISTANCE = 2;
+export const VENUE_NAME_MIN_LENGTH = 8;
+
+/**
+ * Whether two normalized venue names are the same mall typed differently:
+ * both at least 8 characters, within edit distance 2, and with identical digit
+ * sequences (so "Mall 1" and "Mall 2" stay apart).
+ */
+export function isVenueNameTypo(a: string, b: string): boolean {
+  if (a.length < VENUE_NAME_MIN_LENGTH || b.length < VENUE_NAME_MIN_LENGTH) return false;
+  const digits = (s: string) => (s.match(/\d+/g) ?? []).join(' ');
+  if (digits(a) !== digits(b)) return false;
+  return levenshtein(a, b) <= VENUE_NAME_MAX_DISTANCE;
+}
+
+/** A venue name mapped onto an already-loaded venue with a near-identical name. */
+export interface VenueMerge {
+  /** Name as typed in the incoming file. */
+  from: string;
+  /** Name of the venue it was merged into. */
+  to: string;
+}
+
+const VENUE_PREFIX = 'venue:';
+
+/**
+ * Give readings canonical venue ids; returns them, the phone-id → canonical-id
+ * map and the typo merges made. A name not yet seen (in `existing` or earlier
+ * in `readings`) that is a typo of a known venue name (`isVenueNameTypo`) takes
+ * that venue's id, the closest one when several qualify.
+ */
+export function unifyReadingVenues(
+  readings: readonly Reading[],
+  existing: readonly Reading[] = [],
+): { readings: Reading[]; idMap: Map<string, string>; merges: VenueMerge[] } {
+  // Canonical id -> display name of every name-keyed venue known so far.
+  const known = new Map<string, string>();
+  for (const r of existing) {
+    if (r.venueId.startsWith(VENUE_PREFIX) && !known.has(r.venueId)) known.set(r.venueId, r.venueName.trim());
+  }
+  const resolved = new Map<string, string>(); // exact canonical id -> final id
+  const merges: VenueMerge[] = [];
   const idMap = new Map<string, string>();
   const out = readings.map((r) => {
-    const id = canonicalVenueId(r.venueName, r.venueId);
+    const exact = canonicalVenueId(r.venueName, r.venueId);
+    let id = resolved.get(exact);
+    if (id === undefined) {
+      id = exact;
+      if (exact.startsWith(VENUE_PREFIX) && !known.has(exact)) {
+        const key = exact.slice(VENUE_PREFIX.length);
+        let best: string | null = null;
+        let bestDist = Infinity;
+        for (const candidate of known.keys()) {
+          const other = candidate.slice(VENUE_PREFIX.length);
+          if (!isVenueNameTypo(key, other)) continue;
+          const d = levenshtein(key, other);
+          if (d < bestDist) {
+            bestDist = d;
+            best = candidate;
+          }
+        }
+        if (best !== null) {
+          id = best;
+          merges.push({ from: r.venueName.trim(), to: known.get(best)! });
+        }
+      }
+      resolved.set(exact, id);
+      if (!known.has(id)) known.set(id, r.venueName.trim());
+    }
     if (id !== r.venueId) idMap.set(r.venueId, id);
     return id === r.venueId ? r : { ...r, venueId: id };
   });
-  return { readings: out, idMap };
+  return { readings: out, idMap, merges };
 }
 
 /** Add one parsed source (a CSV file or the synthetic sample) to a dataset. */
@@ -143,7 +229,7 @@ export function addSource(
   errors: readonly string[],
   synthetic = false,
 ): Dataset {
-  const unified = unifyReadingVenues(incoming);
+  const unified = unifyReadingVenues(incoming, dataset.readings);
   const merged = mergeReadings(dataset.readings, unified.readings);
   // Wi-Fi scans loaded before these readings still carry the phone's venue id.
   const wifiScans = dataset.wifiScans.map((s) => {
@@ -164,6 +250,7 @@ export function addSource(
         duplicates: merged.duplicates,
         errors: [...errors],
         synthetic,
+        ...(unified.merges.length ? { venueMerges: unified.merges } : {}),
       },
     ],
   };

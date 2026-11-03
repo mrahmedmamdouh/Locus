@@ -5,6 +5,11 @@ export interface Settings {
   floorHeightM: number;
   source: AltitudeSource;
   gate: GateCriteria;
+  /**
+   * Floor height (m) per canonical venue id, overriding the heights recorded
+   * on the phones (see `applyFloorHeightOverrides`). Missing = use recorded.
+   */
+  venueFloorHeightM: Record<string, number>;
 }
 
 export const DEFAULT_FLOOR_HEIGHT_M = 4.5;
@@ -13,6 +18,7 @@ export const DEFAULT_SETTINGS: Settings = {
   floorHeightM: DEFAULT_FLOOR_HEIGHT_M,
   source: 'baro',
   gate: { ...DEFAULT_GATE },
+  venueFloorHeightM: {},
 };
 
 /** Bounds keep user-typed values physically meaningful. */

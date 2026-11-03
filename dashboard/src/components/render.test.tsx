@@ -41,6 +41,40 @@ describe('render smoke tests', () => {
     expect(html).not.toContain('cannot pass');
   });
 
+  it('settings list loaded venues for a floor height override', () => {
+    const html = renderToString(
+      <SettingsPanel
+        settings={{ ...DEFAULT_SETTINGS, venueFloorHeightM: { 'venue:avenues mall': 5.75 } }}
+        onChange={() => {}}
+        venues={[
+          { id: 'venue:avenues mall', name: 'Avenues Mall', readings: 106, recordedM: [4.5] },
+          { id: 'venue:mall of oman', name: 'Mall of Oman', readings: 60, recordedM: [4.5] },
+        ]}
+      />,
+    );
+    expect(html).toContain('Floor height per venue (m)');
+    expect(html).toContain('Use when the floor height entered on the phone was wrong; readings are re-classified with the height you enter.');
+    expect(html).toContain('Avenues Mall');
+    expect(html).toContain('recorded 4.5 m');
+    expect(html).toContain('value="5.75"');
+  });
+
+  it('notes merged venue names under the file', () => {
+    const html = renderToString(
+      <DataLoader
+        files={[{ name: 'a.csv', kind: 'readings', parsed: 1, added: 1, duplicates: 0, errors: [], synthetic: false, venueMerges: [{ from: 'Avenus Mall', to: 'Avenues Mall' }] }]}
+        total={1}
+        included={1}
+        exclusion={{ excludeDemo: true, excludeSynthetic: false }}
+        onFiles={() => {}}
+        onSample={() => {}}
+        onClear={() => {}}
+        onExclusion={() => {}}
+      />,
+    );
+    expect(html).toContain('Merged venue names: &#x27;Avenus Mall&#x27; → &#x27;Avenues Mall&#x27;');
+  });
+
   it('source comparison shows p90 in floors', () => {
     const html = renderToString(<SourceComparison bySource={a.bySource} gateSource="baro" floorHeightM={4.5} />);
     expect(html).toMatch(/\d\.\d\d floors/);

@@ -312,6 +312,19 @@ select {
   gap: 4px;
   min-width: 0;
 }
+.venue-heights {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 8px;
+}
+.venue-heights legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.venue-height .field-label .muted {
+  font-weight: 400;
+}
 
 .check {
   display: flex;

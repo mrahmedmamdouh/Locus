@@ -1,5 +1,7 @@
+import { useEffect, useId, useState } from 'react';
 import type { AltitudeSource } from '@locus/altitude-core';
 import { SOURCE_LABEL } from '../lib/data';
+import type { VenueFloorHeightRow } from '../lib/floorHeight';
 import { DEFAULT_SETTINGS, LIMITS, PARSE, type Settings } from '../lib/settings';
 import { Card, NumberField, Segmented } from './common';
 
@@ -9,11 +11,67 @@ const SOURCE_OPTIONS: { value: AltitudeSource; label: string }[] = [
   { value: 'os', label: 'iOS OS' },
 ];
 
+/** One venue's floor height override: empty = use the heights recorded on the phones. */
+function VenueFloorHeightField({
+  venue,
+  value,
+  onCommit,
+}: {
+  venue: VenueFloorHeightRow;
+  value: number | undefined;
+  onCommit: (h: number | undefined) => void;
+}) {
+  const id = useId();
+  const [text, setText] = useState(value === undefined ? '' : String(value));
+  useEffect(() => {
+    // Sync when the value changes from outside (e.g. "Reset to defaults").
+    setText((t) => {
+      const parsed = PARSE.floorHeightM(t);
+      return (parsed ?? undefined) === value ? t : value === undefined ? '' : String(value);
+    });
+  }, [value]);
+  const invalid = text.trim() !== '' && PARSE.floorHeightM(text) === null;
+  const recorded = venue.recordedM.length
+    ? `recorded ${venue.recordedM.map((h) => `${h} m`).join(', ')}`
+    : 'no height recorded';
+  return (
+    <div className="field venue-height">
+      <label htmlFor={id} className="field-label">
+        {venue.name} <span className="muted">({venue.readings.toLocaleString()} readings, {recorded})</span>
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        step="any"
+        placeholder="Recorded"
+        value={text}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? `${id}-err` : undefined}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (e.target.value.trim() === '') onCommit(undefined);
+          else {
+            const n = PARSE.floorHeightM(e.target.value);
+            if (n !== null) onCommit(n);
+          }
+        }}
+      />
+      {invalid ? (
+        <span id={`${id}-err`} className="field-error">
+          Enter {LIMITS.floorHeightM.min}–{LIMITS.floorHeightM.max} m, or leave empty.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsPanel({
   settings,
   onChange,
   loadedReadings = 0,
   fallbackReadings = 0,
+  venues = [],
 }: {
   settings: Settings;
   onChange: (s: Settings) => void;
@@ -21,8 +79,16 @@ export function SettingsPanel({
   loadedReadings?: number;
   /** Of those, readings without a per-floor height (judged against the fallback). */
   fallbackReadings?: number;
+  /** Loaded venues, for the per-venue floor height override. */
+  venues?: VenueFloorHeightRow[];
 }) {
   const { gate } = settings;
+  const setVenueHeight = (venueId: string, h: number | undefined) => {
+    const venueFloorHeightM = { ...settings.venueFloorHeightM };
+    if (h === undefined) delete venueFloorHeightM[venueId];
+    else venueFloorHeightM[venueId] = h;
+    onChange({ ...settings, venueFloorHeightM });
+  };
   const accuracyPct = Math.round(gate.minFloorAccuracy * 1000) / 10;
   return (
     <Card
@@ -67,6 +133,23 @@ export function SettingsPanel({
               : `${fallbackReadings.toLocaleString()} of ${loadedReadings.toLocaleString()} loaded readings use the fallback.`}
           </span>
         </div>
+        {venues.length > 0 ? (
+          <fieldset className="field-group span-2 venue-heights">
+            <legend className="field-label">Floor height per venue (m)</legend>
+            <span className="field-hint">
+              Use when the floor height entered on the phone was wrong; readings are re-classified with the height
+              you enter.
+            </span>
+            {venues.map((v) => (
+              <VenueFloorHeightField
+                key={v.id}
+                venue={v}
+                value={settings.venueFloorHeightM[v.id]}
+                onCommit={(h) => setVenueHeight(v.id, h)}
+              />
+            ))}
+          </fieldset>
+        ) : null}
         <NumberField
           label="Min floor accuracy"
           suffix="%"

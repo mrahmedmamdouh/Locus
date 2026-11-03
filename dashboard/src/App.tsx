@@ -15,6 +15,7 @@ import {
   type ExclusionOptions,
 } from './lib/data';
 import { DEFAULT_SETTINGS, type Settings } from './lib/settings';
+import { applyFloorHeightOverrides, venueFloorHeights } from './lib/floorHeight';
 import { DataLoader, type LoadedFile } from './components/DataLoader';
 import { SettingsPanel } from './components/SettingsPanel';
 import { VerdictCard } from './components/VerdictCard';
@@ -83,7 +84,13 @@ export function App() {
   const [exclusion, setExclusion] = useState<ExclusionOptions>(DEFAULT_EXCLUSION);
   const [settings, setSettings] = useState<Settings>(() => structuredClone(DEFAULT_SETTINGS));
 
-  const included = useMemo(() => applyExclusions(dataset.readings, exclusion), [dataset.readings, exclusion]);
+  // Every analysis below sees readings re-classified with any per-venue floor height override.
+  const corrected = useMemo(
+    () => applyFloorHeightOverrides(dataset.readings, settings.venueFloorHeightM),
+    [dataset.readings, settings.venueFloorHeightM],
+  );
+  const venueHeights = useMemo(() => venueFloorHeights(dataset.readings), [dataset.readings]);
+  const included = useMemo(() => applyExclusions(corrected, exclusion), [corrected, exclusion]);
   const includedChecks = useMemo(
     () => applyExclusions(dataset.deviceChecks, exclusion),
     [dataset.deviceChecks, exclusion],
@@ -206,19 +213,24 @@ export function App() {
             onChange={setSettings}
             loadedReadings={analysis?.total ?? 0}
             fallbackReadings={analysis?.fallbackFloorRows ?? 0}
+            venues={venueHeights}
           />
         </div>
 
         {analysis ? (
           <>
-            <SourceComparison bySource={analysis.bySource} gateSource={settings.source} floorHeightM={settings.floorHeightM} />
+            <SourceComparison
+              bySource={analysis.bySource}
+              gateSource={settings.source}
+              floorHeightM={analysis.typicalFloorHeightM}
+            />
             <Breakdowns breakdowns={analysis.breakdowns} source={settings.source} />
             <div className="grid-2">
               <DriftChart
                 drift={analysis.drift}
                 bucketMinutes={analysis.driftBucketMinutes}
                 advice={analysis.advice}
-                floorHeightM={settings.floorHeightM}
+                floorHeightM={analysis.typicalFloorHeightM}
               />
               <ErrorScatter readings={included} />
             </div>
