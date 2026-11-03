@@ -154,3 +154,15 @@ describe('Wi-Fi majority baseline', () => {
     expect(ev.majorityBaseline).toBe(0.75);
   });
 });
+
+describe('Wi-Fi holdout with partial sessions', () => {
+  it('uses the time holdout when sessions each cover only some floors (Avenues Mall, 1 Nov)', () => {
+    const readings = generateSampleReadings(42, 12);
+    const all = generateSampleWifiScans(readings).filter((s) => s.venueId === 'demo-cairo' && s.sessionId === generateSampleWifiScans(readings).find((x) => x.venueId === 'demo-cairo')!.sessionId);
+    // Split one visit into laps that each cover different floors.
+    const lapA = all.filter((s) => s.trueFloorIndex <= 0).map((s) => ({ ...s, sessionId: 'lapA' }));
+    const lapB = all.filter((s) => s.trueFloorIndex > 0).map((s) => ({ ...s, sessionId: 'lapB' }));
+    const ev = evaluateWifiFloors([...lapA, ...lapB]);
+    expect(ev.predictions.every((p) => p.holdout === 'time')).toBe(true);
+  });
+});

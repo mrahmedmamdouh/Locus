@@ -197,8 +197,9 @@ export interface FingerprintOptions {
   sameSpotSeconds: number;
   /**
    * A session only counts towards the "other sessions" holdout if it has at
-   * least this many usable fingerprints on at least two floors. A short
-   * session (e.g. one reading after a recalibration) is not a separate visit.
+   * least this many usable fingerprints and covers every floor of the venue.
+   * A short or partial session (e.g. one reading after a recalibration, or a
+   * lap of one floor) is not a separate visit.
    */
   minSessionFingerprints: number;
 }
@@ -314,9 +315,14 @@ export function evaluateWifiFloors(
     // Session holdout only when at least two sessions are real visits on their own.
     const bySession = new Map<string, Fingerprint[]>();
     for (const f of venueFps) bySession.set(f.sessionId, [...(bySession.get(f.sessionId) ?? []), f]);
-    const fullSessions = [...bySession.values()].filter(
-      (fs) => fs.length >= opts.minSessionFingerprints && new Set(fs.map((f) => f.trueFloorIndex)).size >= 2,
-    );
+    // ...and only when each of them covered every floor of the venue; otherwise a
+    // floor recorded in one session only (e.g. B1 on the last lap) can never be
+    // predicted from the others and the score says nothing about Wi-Fi.
+    const venueFloors = new Set(venueFps.map((f) => f.trueFloorIndex));
+    const fullSessions = [...bySession.values()].filter((fs) => {
+      const floors = new Set(fs.map((f) => f.trueFloorIndex));
+      return fs.length >= opts.minSessionFingerprints && floors.size >= 2 && [...venueFloors].every((x) => floors.has(x));
+    });
     const multiSession = fullSessions.length >= 2;
     for (const test of venueFps) {
       const train = venueFps.filter((f) =>
