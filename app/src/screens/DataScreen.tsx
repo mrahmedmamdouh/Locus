@@ -10,6 +10,7 @@ import { fmt, fmtPct, fmtSigned } from '../logic/numbers';
 import { Banner, Button, Card, Chip, H1, H2, Muted, Row } from '../ui/kit';
 import { colors, space } from '../ui/theme';
 import { confirm, notify } from '../ui/confirm';
+import { useAutoMode } from '../state/AutoMode';
 
 type Scope = 'session' | 'all';
 
@@ -17,6 +18,7 @@ export function DataScreen() {
   const { readings, activeSession, venues, deleteReading, clearReadings, deviceChecks, deleteDeviceCheck, wifiScans } = useAppState();
   const [scope, setScope] = useState<Scope>(activeSession ? 'session' : 'all');
   const [busy, setBusy] = useState(false);
+  const auto = useAutoMode();
 
   const effectiveScope: Scope = activeSession ? scope : 'all';
   const list = useMemo(
@@ -45,6 +47,7 @@ export function DataScreen() {
         floorHeightM: h,
         baro: summarize(rs, 'baro', h),
         gps: summarize(rs, 'gps', h),
+        auto: summarize(rs, 'auto', h),
       };
     });
   }, [list, venues]);
@@ -87,6 +90,18 @@ export function DataScreen() {
     setBusy(true);
     try {
       await exportWifiScansCsv(wifiScans.slice().sort((a, b) => a.scannedAt.localeCompare(b.scannedAt)));
+    } catch (e) {
+      notify('Export failed', e instanceof Error ? e.message : 'Unknown error.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doExportAutoEvents = async () => {
+    setBusy(true);
+    try {
+      const n = await auto.exportEvents();
+      if (n === 0) notify('Nothing to export', 'No Auto mode events yet. Turn on Auto mode in Settings.');
     } catch (e) {
       notify('Export failed', e instanceof Error ? e.message : 'Unknown error.');
     } finally {
@@ -144,6 +159,7 @@ export function DataScreen() {
             </Text>
             <SummaryLine name="Barometer" s={g.baro} />
             <SummaryLine name="GPS" s={g.gps} />
+            {g.auto.n > 0 ? <SummaryLine name="Auto mode" s={g.auto} /> : null}
             <Muted>“Within ½ floor” uses a {fmt(g.floorHeightM, 1)} m floor height.</Muted>
           </View>
         ))}
@@ -187,8 +203,20 @@ export function DataScreen() {
             />
           </>
         ) : null}
+        {auto.eventCount > 0 || auto.enabled ? (
+          <>
+            <View style={{ height: space.sm }} />
+            <Button
+              title={`Export Auto mode events (${auto.eventCount})`}
+              variant="secondary"
+              onPress={() => void doExportAutoEvents()}
+              busy={busy}
+              disabled={auto.eventCount === 0}
+            />
+          </>
+        ) : null}
         <View style={{ height: space.sm }} />
-        <Muted>Readings, device checks and Wi-Fi scans are separate files; share all of them with the team.</Muted>
+        <Muted>Readings, device checks, Wi-Fi scans and Auto mode events are separate files; share all of them with the team.</Muted>
       </Card>
 
       <Card>

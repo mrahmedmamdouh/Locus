@@ -1,5 +1,7 @@
 import { registerRootComponent } from 'expo';
 
+// Defines the background geofence task at module scope (must happen before the app registers).
+import './src/native/autoGeofence';
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

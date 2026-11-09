@@ -1,4 +1,5 @@
 import {
+  altitudeFor,
   classifyFloor,
   floorCenterM,
   relativeAltitudeFromPressure,
@@ -9,9 +10,10 @@ import {
   type WifiScan,
 } from '@locus/altitude-core';
 import { fixForWindow } from './gps';
-import { round, roundOrNull } from './numbers';
+import { fmtSigned, round, roundOrNull } from './numbers';
 import { secondsBetween } from './time';
 import type { BaroWindow, GpsFix, Session } from './types';
+import { NO_AUTO_FIELDS, type AutoFields } from './autoMode';
 
 export const DEMO_NOTE_PREFIX = 'DEMO';
 
@@ -32,6 +34,8 @@ export interface BuildReadingInput {
   demo: boolean;
   /** Wi-Fi scan taken during the window (status + cleaned access points); null = none attempted. */
   wifi: Pick<WifiScan, 'status' | 'aps'> | null;
+  /** Automatic-mode columns (see buildAutoFields); omitted = all null. */
+  auto?: AutoFields;
 }
 
 export function demoNote(note: string, demo: boolean): string {
@@ -112,7 +116,13 @@ export function buildReading(input: BuildReadingInput): Reading {
     wifiApCount:
       input.wifi && input.wifi.status !== 'unsupported' && input.wifi.status !== 'skipped' ? input.wifi.aps.length : null,
     notes: demoNote(input.note, input.demo),
+    ...(input.auto ?? NO_AUTO_FIELDS),
   };
+}
+
+/** Pressure (hPa) of a recording window, the same trimmed mean buildReading stores. */
+export function windowPressure(baro: BaroWindow): number | null {
+  return trimmedMean(baro.pressures.filter((p) => Number.isFinite(p) && p > 0));
 }
 
 export interface SourceOutcome {
@@ -127,6 +137,8 @@ export interface ReadingOutcome {
   baro: SourceOutcome;
   gps: SourceOutcome;
   os: SourceOutcome;
+  /** Automatic mode (geofence baseline + drift correction). */
+  auto: SourceOutcome;
 }
 
 function outcome(
@@ -153,5 +165,27 @@ export function readingOutcome(r: Reading, floors: Floor[]): ReadingOutcome {
     baro: outcome(r.baroRelAltM, r.estFloorIndexBaro, r, floors),
     gps: outcome(r.gpsRelAltM, r.estFloorIndexGps, r, floors),
     os: outcome(r.osRelAltM, null, r, floors),
+    auto: outcome(altitudeFor(r, 'auto'), r.autoEstFloorIndex ?? null, r, floors),
   };
+}
+
+function verdictText(o: SourceOutcome): string {
+  if (o.offTable) return 'off the floor table ✗';
+  if (o.estFloorLabel === null) return 'no data';
+  return `floor ${o.estFloorLabel} ${o.correct ? '✓' : '✗'}`;
+}
+
+/**
+ * One-line comparison for the result card, e.g.
+ * "Manual: floor 1 ✓ · Auto: floor 1 ✓ (drift −0.4 m)". Null when auto mode was off.
+ */
+export function manualVsAutoLine(r: Reading, floors: Floor[]): string | null {
+  if (r.autoCalibrationSource === null || r.autoCalibrationSource === undefined) return null;
+  const o = readingOutcome(r, floors);
+  const manual = `Manual: ${verdictText(o.baro)}`;
+  if (r.autoRelAltM === null || r.autoRelAltM === undefined) {
+    return `${manual} · Auto: no automatic baseline yet`;
+  }
+  const drift = r.autoDriftOffsetM !== null && r.autoDriftOffsetM !== undefined ? ` (drift ${fmtSigned(r.autoDriftOffsetM, 1, 'm').replace('-', '−')})` : '';
+  return `${manual} · Auto: ${verdictText(o.auto)}${drift}`;
 }

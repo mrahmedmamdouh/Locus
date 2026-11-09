@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DeviceCheck, Reading, Venue, WifiScan } from '@locus/altitude-core';
 import type { Session } from '../logic/types';
+import type { AutoBaseline } from '../logic/autoMode';
+import { parseAutoEventLines, serializeAutoEvent, type AutoEvent } from '../logic/autoEvents';
 
 /**
  * Tiny persistence layer over AsyncStorage. Everything stays on the phone;
@@ -24,7 +26,14 @@ export const KEYS = {
   deviceChecks: 'locus.v1.deviceChecks',
   wifiIndex: 'locus.v1.wifiScanSessions',
   wifiPrefix: 'locus.v1.wifiScans:',
+  /** Automatic mode: one key per event (one JSON line), so background and foreground writers never race. */
+  autoEventPrefix: 'locus.v1.autoEvent:',
+  /** Automatic mode: the baseline in use (written by the geofence task too). */
+  autoBaseline: 'locus.v1.autoBaseline',
 } as const;
+
+/** Oldest automatic-mode events beyond this are dropped on load. */
+export const MAX_AUTO_EVENTS = 5000;
 
 export const readingKey = (sessionId: string) => `${KEYS.readingPrefix}${sessionId}`;
 export const wifiKey = (sessionId: string) => `${KEYS.wifiPrefix}${sessionId}`;
@@ -36,6 +45,8 @@ export interface KeyValueStore {
   setItem(key: string, value: string): Promise<void>;
   removeItem(key: string): Promise<void>;
   getAllKeys(): Promise<readonly string[]>;
+  /** Optional batch read (AsyncStorage has it); falls back to getItem. */
+  multiGet?(keys: readonly string[]): Promise<readonly (readonly [string, string | null])[]>;
 }
 
 export interface Settings {
@@ -46,6 +57,8 @@ export interface Settings {
   deviceCheckPromptDone: boolean;
   /** Record a Wi-Fi scan with each reading (Android only). */
   recordWifi: boolean;
+  /** Automatic mode: geofence-triggered baseline + drift correction, recorded next to the manual one. */
+  autoMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -54,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultTemperatureC: 24,
   deviceCheckPromptDone: false,
   recordWifi: true,
+  autoMode: false,
 };
 
 export interface PersistedState {
@@ -77,6 +91,13 @@ const normalizeReading = (r: Reading): Reading => ({
   trueFloorHeightM: r.trueFloorHeightM ?? null,
   wifiScanStatus: r.wifiScanStatus ?? null,
   wifiApCount: r.wifiApCount ?? null,
+  autoCalibrationSource: r.autoCalibrationSource ?? null,
+  autoCalibratedAt: r.autoCalibratedAt ?? null,
+  autoBaselinePressureHpa: r.autoBaselinePressureHpa ?? null,
+  minutesSinceAutoCalibration: r.minutesSinceAutoCalibration ?? null,
+  autoRelAltM: r.autoRelAltM ?? null,
+  autoDriftOffsetM: r.autoDriftOffsetM ?? null,
+  autoEstFloorIndex: r.autoEstFloorIndex ?? null,
 });
 const normalizeWifiScan = (s: WifiScan): WifiScan => ({ ...s, aps: Array.isArray(s.aps) ? s.aps : [] });
 
@@ -263,8 +284,58 @@ export function createStorage(kv: KeyValueStore) {
     saveSettings: (s: Settings) => kv.setItem(KEYS.settings, JSON.stringify(s)),
     /** Persist the full device-check list. Call only after loadAll() succeeded. */
     saveDeviceChecks: (c: DeviceCheck[]) => kv.setItem(KEYS.deviceChecks, JSON.stringify(c)),
+
+    /** Append one automatic-mode event (its own key: safe to call from the background task). */
+    appendAutoEvent: (e: AutoEvent) => kv.setItem(`${KEYS.autoEventPrefix}${e.id}`, serializeAutoEvent(e)),
+    /** All automatic-mode events, oldest first. Drops the oldest beyond MAX_AUTO_EVENTS. */
+    async loadAutoEvents(): Promise<AutoEvent[]> {
+      const keys = (await kv.getAllKeys()).filter((k) => k.startsWith(KEYS.autoEventPrefix));
+      let values: (string | null)[];
+      if (kv.multiGet) {
+        values = (await kv.multiGet(keys)).map(([, v]) => v);
+      } else {
+        values = [];
+        for (const k of keys) values.push(await kv.getItem(k));
+      }
+      const events = parseAutoEventLines(values.filter((v): v is string => v !== null));
+      if (events.length > MAX_AUTO_EVENTS) {
+        const drop = events.slice(0, events.length - MAX_AUTO_EVENTS);
+        for (const e of drop) await kv.removeItem(`${KEYS.autoEventPrefix}${e.id}`).catch(() => undefined);
+        return events.slice(-MAX_AUTO_EVENTS);
+      }
+      return events;
+    },
+    async clearAutoEvents(): Promise<void> {
+      const keys = (await kv.getAllKeys()).filter((k) => k.startsWith(KEYS.autoEventPrefix));
+      for (const k of keys) await kv.removeItem(k);
+    },
+    async loadAutoBaseline(): Promise<AutoBaseline | null> {
+      const raw = await kv.getItem(KEYS.autoBaseline);
+      if (raw === null) return null;
+      try {
+        const v = JSON.parse(raw) as AutoBaseline | null;
+        return v && typeof v === 'object' && typeof v.venueId === 'string' ? v : null;
+      } catch {
+        return null;
+      }
+    },
+    saveAutoBaseline: (b: AutoBaseline | null) =>
+      b === null ? kv.removeItem(KEYS.autoBaseline) : kv.setItem(KEYS.autoBaseline, JSON.stringify(b)),
   };
 }
 
 const appStorage = createStorage(AsyncStorage);
-export const { loadAll, saveVenues, saveSessions, saveReadings, saveWifiScans, saveSettings, saveDeviceChecks } = appStorage;
+export const {
+  loadAll,
+  saveVenues,
+  saveSessions,
+  saveReadings,
+  saveWifiScans,
+  saveSettings,
+  saveDeviceChecks,
+  appendAutoEvent,
+  loadAutoEvents,
+  clearAutoEvents,
+  loadAutoBaseline,
+  saveAutoBaseline,
+} = appStorage;

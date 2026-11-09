@@ -26,6 +26,17 @@ export interface Venue {
   /** Optional known elevation of the entrance above sea level (meters). */
   entranceAltitudeM?: number;
   floors: Floor[];
+  /** Automatic mode (v0.4): the mall's 2D boundary, a circle. Missing/null = not set. */
+  boundary?: VenueBoundary | null;
+  /** Automatic mode: floor index of the main entrances (where a geofence entry is assumed). Default 0. */
+  entranceFloorIndex?: number;
+}
+
+/** A venue's 2D boundary for geofence entry detection. */
+export interface VenueBoundary {
+  lat: number;
+  lon: number;
+  radiusM: number;
 }
 
 /** A merchant location as a 3D geofence: a vertical cylinder. */
@@ -114,8 +125,32 @@ export interface Reading {
   wifiScanStatus: string | null;
   /** Access points kept after cleaning (hotspots dropped). */
   wifiApCount: number | null;
+
+  /**
+   * Automatic mode (v0.4): what a customer would get with no manual calibration.
+   * All null when no automatic baseline existed at capture (and in older exports).
+   */
+  /** How the automatic baseline was triggered: 'geofence-foreground' | 'geofence-background' | 'none'. */
+  autoCalibrationSource: string | null;
+  /** When the automatic baseline was taken (ISO 8601). */
+  autoCalibratedAt: string | null;
+  /**
+   * Pressure of the automatic baseline (hPa), referred to height 0 of the floor table
+   * (the entrance-floor median moved down by the entrance floor's height).
+   */
+  autoBaselinePressureHpa: number | null;
+  minutesSinceAutoCalibration: number | null;
+  /** Raw height vs the automatic baseline, relative to the floor table (m), before drift correction. */
+  autoRelAltM: number | null;
+  /** Drift offset from floor snapping at capture (m); corrected height = autoRelAltM − autoDriftOffsetM. */
+  autoDriftOffsetM: number | null;
+  /** Floor estimated by automatic mode (corrected height). */
+  autoEstFloorIndex: number | null;
   notes: string;
 }
 
+/** How an automatic baseline was triggered. */
+export type AutoCalibrationSource = 'geofence-foreground' | 'geofence-background' | 'none';
+
 /** Which altitude source to evaluate. */
-export type AltitudeSource = 'baro' | 'gps' | 'os';
+export type AltitudeSource = 'baro' | 'gps' | 'os' | 'auto';

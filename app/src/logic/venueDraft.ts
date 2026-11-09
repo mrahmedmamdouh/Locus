@@ -1,4 +1,4 @@
-import { buildUniformFloors, validateFloors, type Floor } from '@locus/altitude-core';
+import { buildUniformFloors, typicalFloorHeightM, validateFloors, type Floor } from '@locus/altitude-core';
 import { parseCount, parseDecimal } from './numbers';
 
 /** Editable floor row: numbers kept as text while the tester types. */
@@ -67,4 +67,30 @@ export function venueProblems(d: VenueDraft): { floors: Floor[] | null; problems
   if (!d.country.trim()) problems.push('Country is required.');
   const parsed = parseDrafts(d.floors);
   return { floors: parsed.floors, problems: [...problems, ...parsed.problems] };
+}
+
+/**
+ * Apply a floor height to an existing table: uniform bands centred on index × height,
+ * keeping the tester's labels. Returns null (with an error) for an invalid height.
+ */
+export function rescaleDrafts(drafts: FloorDraft[], heightText: string): { drafts: FloorDraft[] | null; error: string | null } {
+  const h = parseDecimal(heightText);
+  if (h === null || h < 2 || h > 15) return { drafts: null, error: 'Floor height must be between 2 and 15 m.' };
+  const r = (x: number) => Math.round(x * 1000) / 1000 || 0;
+  return {
+    drafts: drafts.map((d) => ({ ...d, zMin: String(r(d.index * h - h / 2)), zMax: String(r(d.index * h + h / 2)) })),
+    error: null,
+  };
+}
+
+/**
+ * True when the floor table's typical height differs from the entered floor height by more than
+ * 5 cm (the tester changed the height but did not apply it). False when either cannot be read.
+ */
+export function floorHeightMismatch(drafts: FloorDraft[], heightText: string): boolean {
+  const h = parseDecimal(heightText);
+  const parsed = parseDrafts(drafts).floors;
+  if (h === null || !parsed) return false;
+  const t = typicalFloorHeightM(parsed);
+  return t !== null && Math.abs(t - h) > 0.05;
 }

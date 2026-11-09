@@ -34,6 +34,14 @@ export const READING_COLUMNS = [
   'wifiScanStatus',
   'wifiApCount',
   'notes',
+  // v0.4 automatic mode (optional; appended so older column orders stay a prefix).
+  'autoCalibrationSource',
+  'autoCalibratedAt',
+  'autoBaselinePressureHpa',
+  'minutesSinceAutoCalibration',
+  'autoRelAltM',
+  'autoDriftOffsetM',
+  'autoEstFloorIndex',
 ] as const satisfies readonly (keyof Reading)[];
 
 const NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
@@ -56,6 +64,11 @@ const NUMERIC: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'estFloorIndexGps',
   'sampleCount',
   'wifiApCount',
+  'autoBaselinePressureHpa',
+  'minutesSinceAutoCalibration',
+  'autoRelAltM',
+  'autoDriftOffsetM',
+  'autoEstFloorIndex',
 ]);
 
 /** Columns added after v0.1; files without them still load (value = null). */
@@ -63,6 +76,13 @@ const OPTIONAL_COLUMNS: ReadonlySet<keyof Reading> = new Set<keyof Reading>([
   'trueFloorHeightM',
   'wifiScanStatus',
   'wifiApCount',
+  'autoCalibrationSource',
+  'autoCalibratedAt',
+  'autoBaselinePressureHpa',
+  'minutesSinceAutoCalibration',
+  'autoRelAltM',
+  'autoDriftOffsetM',
+  'autoEstFloorIndex',
 ]);
 
 /** Characters that make a spreadsheet treat a text cell as a formula. */

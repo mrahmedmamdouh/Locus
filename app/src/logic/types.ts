@@ -34,6 +34,8 @@ export interface Session {
   /** Identifies the sensor stream the OS baseline belongs to; a restarted stream invalidates it. */
   sensorEpoch: string | null;
   demo: boolean;
+  /** Auto mode was on when this session started (v0.4; missing in older sessions). */
+  autoMode?: boolean;
 }
 
 /** Barometer samples collected over a window. */

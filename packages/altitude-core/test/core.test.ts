@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GATE,
+  altitudeFor,
   buildUniformFloors,
   classifyFloor,
   csvToReadings,
@@ -168,6 +169,39 @@ describe('CSV round trip', () => {
     expect(result.readings[0]!.trueFloorHeightM).toBeNull();
   });
 
+  it('still loads exports made before the automatic-mode columns existed', () => {
+    const csv = readingsToCsv(generateSampleReadings(8, 1));
+    const rows = csv.trimEnd().split('\r\n').map((l) => l.split(','));
+    const autoCols = new Set(
+      rows[0]!.map((h, i) => (h.startsWith('auto') || h === 'minutesSinceAutoCalibration' ? i : -1)).filter((i) => i >= 0),
+    );
+    expect(autoCols.size).toBe(7);
+    const old = rows.map((r) => r.filter((_, i) => !autoCols.has(i)).join(',')).join('\r\n');
+    const result = csvToReadings(old);
+    expect(result.errors).toEqual([]);
+    const r = result.readings[0]!;
+    expect(r.autoCalibrationSource).toBeNull();
+    expect(r.autoCalibratedAt).toBeNull();
+    expect(r.autoRelAltM).toBeNull();
+    expect(r.autoEstFloorIndex).toBeNull();
+  });
+
+  it('round-trips readings without an automatic baseline (all auto fields null)', () => {
+    const readings = generateSampleReadings(9, 1).map((r) => ({
+      ...r,
+      autoCalibrationSource: null,
+      autoCalibratedAt: null,
+      autoBaselinePressureHpa: null,
+      minutesSinceAutoCalibration: null,
+      autoRelAltM: null,
+      autoDriftOffsetM: null,
+      autoEstFloorIndex: null,
+    }));
+    const parsed = csvToReadings(readingsToCsv(readings));
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.readings).toEqual(readings);
+  });
+
   it('reports missing columns', () => {
     expect(csvToReadings('a,b\r\n1,2').errors[0]).toMatch(/Missing columns/);
   });
@@ -227,6 +261,27 @@ describe('statistics and gate', () => {
     const ios = summarize(readings, 'os', 4.5);
     expect(ios.n).toBeGreaterThan(0);
     expect(ios.floorAccuracy).not.toBeNull();
+  });
+
+  it('evaluates automatic mode: height = autoRelAltM − autoDriftOffsetM, floor = autoEstFloorIndex', () => {
+    const base = readings[0]!;
+    const r = { ...base, trueFloorCenterM: 0, trueFloorIndex: 0, trueFloorHeightM: 6, autoRelAltM: 2.5, autoDriftOffsetM: 2, autoEstFloorIndex: 0 };
+    expect(altitudeFor(r, 'auto')).toBeCloseTo(0.5);
+    expect(altitudeFor({ ...r, autoDriftOffsetM: null }, 'auto')).toBeCloseTo(2.5);
+    expect(altitudeFor({ ...r, autoRelAltM: null }, 'auto')).toBeNull();
+    const s = summarize([r, { ...r, id: 'w', autoEstFloorIndex: 1 }, { ...r, id: 'off', autoEstFloorIndex: null }, { ...r, id: 'none', autoRelAltM: null }], 'auto', 6);
+    expect(s.n).toBe(3); // the row without an automatic baseline is not usable
+    expect(s.floorAccuracy).toBeCloseTo(1 / 3); // off the table counts as wrong
+    expect(s.meanErrorM).toBeCloseTo(0.5);
+  });
+
+  it('passes the gate in automatic mode on synthetic data', () => {
+    const auto = summarize(readings, 'auto', 4.5);
+    expect(auto.n).toBe(readings.length);
+    expect(auto.floorAccuracy!).toBeGreaterThan(0.85);
+    expect(evaluateGate(readings, 4.5, 'auto').verdict).toBe('pass');
+    const noAuto = readings.map((r) => ({ ...r, autoRelAltM: null }));
+    expect(evaluateGate(noAuto, 4.5, 'auto').verdict).toBe('insufficient-data');
   });
 
   it('refuses a verdict on too little data', () => {

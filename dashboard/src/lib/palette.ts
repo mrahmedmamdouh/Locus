@@ -16,7 +16,7 @@ export interface ChartPalette {
 }
 
 export const LIGHT: ChartPalette = {
-  series: { baro: '#2a78d6', gps: '#eb6834', os: '#1baf7a' },
+  series: { baro: '#2a78d6', gps: '#eb6834', os: '#1baf7a', auto: '#8a5cd1' },
   grid: '#e1e0d9',
   axis: '#c3c2b7',
   tick: '#6c6a64',
@@ -26,7 +26,7 @@ export const LIGHT: ChartPalette = {
 };
 
 export const DARK: ChartPalette = {
-  series: { baro: '#3987e5', gps: '#d95926', os: '#199e70' },
+  series: { baro: '#3987e5', gps: '#d95926', os: '#199e70', auto: '#9b72e0' },
   grid: '#2c2c2a',
   axis: '#383835',
   tick: '#9a988f',

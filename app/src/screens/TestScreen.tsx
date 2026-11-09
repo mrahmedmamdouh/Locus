@@ -6,7 +6,9 @@ import { useAppState } from '../state/AppState';
 import { useSensors } from '../state/SensorContext';
 import { useNow } from '../hooks/useNow';
 import { liveEstimate } from '../logic/live';
-import { buildReading, readingOutcome, type SourceOutcome } from '../logic/reading';
+import { buildReading, manualVsAutoLine, readingOutcome, windowPressure, type SourceOutcome } from '../logic/reading';
+import { useAutoMode } from '../state/AutoMode';
+import { baselineReady } from '../logic/autoMode';
 import { deviceModelLabel } from '../logic/device';
 import { makeId } from '../logic/ids';
 import { THROTTLE_TIP, WIFI_SCAN_TIMEOUT_MS, describeWifiScan, shouldShowThrottleTip, toWifiScan } from '../logic/wifi';
@@ -59,6 +61,7 @@ export function TestScreen() {
 function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; onEnd: () => void }) {
   const { activeSession, venues, readings, addReading, settings, setRecordingInProgress } = useAppState();
   const { baro, location, simHeightRef } = useSensors();
+  const auto = useAutoMode();
   const now = useNow(1000);
   const session = activeSession!;
   const venue = venues.find((v) => v.id === session.venueId)!;
@@ -156,6 +159,7 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
         note,
         demo: settings.demoMode,
         wifi,
+        auto: auto.fieldsFor(venue.id, windowPressure(window), now),
       });
       // Saved even if this screen unmounted meanwhile: a reading is never silently dropped.
       // The scan is stored only where Wi-Fi can be scanned (not for 'unsupported').
@@ -234,6 +238,8 @@ function ActiveSession({ onRecalibrate, onEnd }: { onRecalibrate: () => void; on
         <Muted>Pressure now: {fmt(baro.latest?.pressure, 3, 'hPa')}</Muted>
       </Card>
 
+      {auto.enabled ? <AutoCard venueId={venue.id} now={now} /> : null}
+
       <Card>
         <H2>1. Which floor are you really on?</H2>
         <Muted>Check the mall signs. This is the ground truth.</Muted>
@@ -285,6 +291,7 @@ function ResultCard({
   wifiHistory: WifiScanStatus[];
 }) {
   const o = readingOutcome(reading, floors);
+  const manualVsAuto = manualVsAutoLine(reading, floors);
   const primary = o.baro.correct !== null ? o.baro : o.gps;
   const tone = primary.correct === null ? 'neutral' : primary.correct ? 'good' : 'bad';
   const bg = tone === 'good' ? colors.goodBg : tone === 'bad' ? colors.badBg : colors.card;
@@ -295,6 +302,7 @@ function ResultCard({
         {primary.correct === null ? 'Saved (no estimate)' : primary.correct ? 'Correct floor' : 'Wrong floor'}
       </Text>
       <Muted>True floor {reading.trueFloorLabel} (centre {fmt(reading.trueFloorCenterM, 1, 'm')})</Muted>
+      {manualVsAuto ? <Text style={st.compareLine}>{manualVsAuto}</Text> : null}
       <SourceLine name="Barometer" o={o.baro} />
       <SourceLine name="GPS" o={o.gps} />
       {reading.osRelAltM !== null ? <SourceLine name="iOS altimeter" o={o.os} /> : null}
@@ -310,6 +318,70 @@ function ResultCard({
       <Muted>
         {reading.sampleCount} barometer samples · saved {new Date(reading.timestamp).toLocaleTimeString()}
       </Muted>
+    </Card>
+  );
+}
+
+/** Live automatic-mode status: what a customer would see, next to the manual calibration. */
+function AutoCard({ venueId, now }: { venueId: string; now: number }) {
+  const auto = useAutoMode();
+  const { venues, settings } = useAppState();
+  const venue = venues.find((v) => v.id === venueId)!;
+  const b = auto.baseline && auto.baseline.venueId === venueId ? auto.baseline : null;
+  const ready = baselineReady(b);
+  const floorLabel =
+    auto.live && ready
+      ? auto.live.floorIndex === null
+        ? 'Off table'
+        : (venue.floors.find((f) => f.index === auto.live!.floorIndex)?.label ?? String(auto.live.floorIndex))
+      : '—';
+  const minutes = ready ? (now - Date.parse(b.calibratedAt)) / 60_000 : null;
+  const inside = auto.insideVenueIds.includes(venueId);
+  return (
+    <Card style={{ borderColor: colors.primary }}>
+      <H2>Auto mode (no tester calibration)</H2>
+      {!venue.boundary ? (
+        <Banner tone="warn">This venue has no mall boundary. Set it in Venues → edit venue, then walk in from outside.</Banner>
+      ) : null}
+      {auto.permission === 'foreground-only' ? <Banner tone="warn">Foreground only: keep Locus open while walking in.</Banner> : null}
+      {auto.permission === 'denied' ? <Banner tone="bad">Location is not allowed: the mall boundary cannot be detected.</Banner> : null}
+      {ready ? (
+        <>
+          <Row>
+            <Stat label="Auto height" value={fmtSigned(auto.live?.correctedM, 1, 'm')} sub="drift-corrected" big />
+            <Stat label="Auto floor" value={floorLabel} sub={auto.live?.stationary ? 'still: snapping' : 'moving'} big />
+          </Row>
+          <Row>
+            <Stat label="Drift offset" value={fmtSigned(auto.live?.offsetM ?? b.driftOffsetM, 2, 'm')} />
+            <Stat label="Since auto baseline" value={minutes === null ? '—' : `${minutes.toFixed(0)} min`} sub={b.source} />
+          </Row>
+          <Muted>
+            Baseline {fmt(b.entrancePressureHpa, 2, 'hPa')} at entrance floor ({fmtSigned(b.entranceHeightM, 1, 'm')}) · {b.sampleCount} samples
+            {b.gpsAccuracyM !== null ? ` · GPS ±${fmt(b.gpsAccuracyM, 0)} m` : ''}
+            {b.exitedAt ? ' · left the boundary since' : ''}
+          </Muted>
+        </>
+      ) : b ? (
+        <Banner tone="info">
+          Entry detected ({b.source}); waiting for barometer samples to take the baseline{auto.capturing ? '…' : '.'}
+        </Banner>
+      ) : (
+        <Banner tone="info">
+          {auto.capturing
+            ? 'Taking the automatic baseline (3 s)… stand still.'
+            : inside
+              ? 'Inside the boundary; no automatic baseline yet.'
+              : 'No automatic baseline yet. Walk into the mall from outside the boundary; the baseline is taken on entry.'}
+        </Banner>
+      )}
+      {settings.demoMode ? (
+        <Button
+          title="Demo: simulate entry baseline now"
+          variant="secondary"
+          onPress={() => void auto.captureNow(venue)}
+          disabled={auto.capturing}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -346,5 +418,6 @@ const st = StyleSheet.create({
   floorText: { fontSize: 24, fontWeight: '700', color: colors.text },
   resultTitle: { fontSize: 24, fontWeight: '700', marginBottom: space.xs },
   sourceLine: { fontSize: 17, fontWeight: '600', marginVertical: 2 },
+  compareLine: { fontSize: 17, fontWeight: '700', color: colors.text, marginVertical: 4 },
   wifiLine: { fontSize: 15, color: colors.text, marginVertical: 4 },
 });

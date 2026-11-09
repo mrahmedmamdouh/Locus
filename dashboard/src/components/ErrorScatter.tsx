@@ -10,7 +10,7 @@ const SERIES: AltitudeSource[] = ['baro', 'gps'];
 
 export function ErrorScatter({ readings }: { readings: Reading[] }) {
   const pal = useChartPalette();
-  const [visible, setVisible] = useState<Record<AltitudeSource, boolean>>({ baro: true, gps: true, os: false });
+  const [visible, setVisible] = useState<Record<AltitudeSource, boolean>>({ baro: true, gps: true, os: false, auto: false });
 
   const series = useMemo(
     () =>

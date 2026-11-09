@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppStateProvider, useAppState } from './src/state/AppState';
 import { SensorProvider } from './src/state/SensorContext';
+import { AutoModeProvider } from './src/state/AutoMode';
 import { TestScreen } from './src/screens/TestScreen';
 import { VenuesScreen } from './src/screens/VenuesScreen';
 import { DataScreen } from './src/screens/DataScreen';
@@ -48,6 +49,7 @@ function Root() {
   return (
     <NavContext.Provider value={goTo}>
     <SensorProvider demo={settings.demoMode}>
+    <AutoModeProvider>
       <SafeAreaView style={st.fill} edges={['top', 'left', 'right']}>
         <StatusBar style="dark" />
         {storageError ? (
@@ -100,6 +102,7 @@ function Root() {
           })}
         </View>
       </SafeAreaView>
+    </AutoModeProvider>
     </SensorProvider>
     </NavContext.Provider>
   );

@@ -424,8 +424,8 @@ export const DEFAULT_TABLE_FILTER: TableFilter = { venue: '', device: '', correc
 /** On-device floor estimate stored in the CSV (barometer and GPS only; the OS altimeter has none). */
 export function estFloor(r: Reading, source: AltitudeSource): number | null {
   if (source === 'os') return null;
-  const v = source === 'gps' ? r.estFloorIndexGps : r.estFloorIndexBaro;
-  return v === null || !Number.isFinite(v) ? null : v;
+  const v = source === 'gps' ? r.estFloorIndexGps : source === 'auto' ? r.autoEstFloorIndex : r.estFloorIndexBaro;
+  return v === null || v === undefined || !Number.isFinite(v) ? null : v;
 }
 
 /**
@@ -602,6 +602,7 @@ export const SOURCE_LABEL: Record<AltitudeSource, string> = {
   baro: 'Barometer',
   gps: 'GPS',
   os: 'iOS OS altitude',
+  auto: 'Automatic (geofence + drift)',
 };
 
 /** Safe file name for CSV export: locus-readings-YYYYMMDD-HHMM.csv */

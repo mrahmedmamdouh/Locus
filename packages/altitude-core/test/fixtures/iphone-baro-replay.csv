@@ -1,0 +1,211 @@
+id,sessionId,venueName,timestamp,secondsSinceCalibration,trueFloorLabel,trueFloorIndex,pressureHpa,baselinePressureHpa,temperatureC,baroRelAltM,notes
+rmvwmwq6xpyj1rz,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:47:38.649Z,69.6,G,0,1013.4285,1013.4113,24,-0.148,At Entrance A1
+rmvwn1c6wuy16sg,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:51:13.784Z,284.8,G,0,1013.4407,1013.4113,24,-0.252,A&H
+rmvwn1yhzm25161,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:51:42.695Z,313.7,G,0,1013.449,1013.4113,24,-0.324,A&H
+rmvwn7ueki8h5ci,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:56:17.324Z,588.3,G,0,1013.4253,1013.4113,24,-0.12,Muscat pharmacy
+rmvwna57kr4l9oj,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:58:04.640Z,695.6,G,0,1013.423,1013.4113,24,-0.101,FAB
+rmvwnbj0ci8qq1u,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T16:59:09.180Z,760.2,G,0,1013.4158,1013.4113,24,-0.039,REDTAG
+rmvwndbfbpxloiq,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:00:32.663Z,843.7,1,1,1012.7217,1013.4113,24,5.921,Escalator up
+rmvwndr2zypg7kn,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:00:52.955Z,864,1,1,1012.7184,1013.4113,24,5.949,Escalator Up
+rmvwneznwukq5pe,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:01:50.732Z,921.7,1,1,1012.7205,1013.4113,24,5.931,Hyper Max entrance
+rmvwnh4b49oftxu,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:03:30.064Z,1021.1,1,1,1012.7184,1013.4113,24,5.949,In front of lifts
+rmvwnm8xs5cvlr1,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:07:29.344Z,1260.3,1,1,1012.7304,1013.4113,24,5.846,Lc Wakiki - H&M & Zara
+rmvwnojdj9vesxd,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:09:16.183Z,1367.2,1,1,1012.7351,1013.4113,24,5.805,Sephora
+rmvwnqupb7kv5ru,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:11:04.175Z,1475.2,1,1,1012.7388,1013.4113,24,5.774,Decathlon
+rmvwnr7ppaspiiz,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:11:21.037Z,1492,1,1,1012.7433,1013.4113,24,5.735,Decathlon
+rmvwnso82i6yvj6,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:12:29.090Z,1560.1,1,1,1012.7433,1013.4113,24,5.735,New yorker
+rmvwnv9wr4qu83c,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:14:30.507Z,1681.5,1,1,1012.7406,1013.4113,24,5.758,Costa coffee
+rmvwnwkqpg6vgas,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:15:31.201Z,1742.2,1,1,1012.7478,1013.4113,24,5.697,Mini Sou
+rmvwnzjarmp4fip,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:17:49.299Z,1880.3,1,1,1012.7617,1013.4113,24,5.577,Dior
+rmvwnzucnh1dllg,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:18:03.623Z,1894.6,1,1,1012.7658,1013.4113,24,5.542,Dior
+rmvwo035z0bgyv1,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:18:15.047Z,1906,1,1,1012.7659,1013.4113,24,5.541,Dior
+rmvwo2khrst9c7v,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:20:10.815Z,2021.8,1,1,1012.7687,1013.4113,24,5.517,R&B
+rmvwo47w2qr2n5p,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:21:27.794Z,2098.8,1,1,1012.7701,1013.4113,24,5.505,Centrepoint
+rmvwo4szmqatc3h,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:21:55.138Z,2126.1,1,1,1012.7745,1013.4113,24,5.467,Centrepoint
+rmvwo5alf1txoi4,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:22:17.955Z,2149,1,1,1012.7779,1013.4113,24,5.438,Centrepoint
+rmvwo5inj3mxbu5,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:22:28.399Z,2159.4,1,1,1012.7791,1013.4113,24,5.428,Centrepoint
+rmvwo5sjnoblwfs,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:22:41.219Z,2172.2,1,1,1012.7784,1013.4113,24,5.434,Centrepoint
+rmvwo6jqwiuz8hd,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:23:16.472Z,2207.5,1,1,1012.7806,1013.4113,24,5.415,Escalator below
+rmvwo8eb1w6w1hr,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:24:42.733Z,2293.7,2,2,1012.0886,1013.4113,24,11.36,Escalator Up
+rmvwo8slzz4mufc,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:25:01.271Z,2312.3,2,2,1012.086,1013.4113,24,11.382,Escalator Up
+rmvwo93u4u7n3rc,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:25:15.820Z,2326.8,2,2,1012.0854,1013.4113,24,11.387,Escalator Up
+rmvwo9d7g6ikqt7,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:25:27.964Z,2339,2,2,1012.0778,1013.4113,24,11.453,Escalator Up
+rmvwoaovkpns6xy,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:26:29.744Z,2400.7,2,2,1012.0801,1013.4113,24,11.433,Food court
+rmvwoaywetesz0f,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:26:42.734Z,2413.7,2,2,1012.0879,1013.4113,24,11.366,Food court
+rmvwobcb13duh1l,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:27:00.109Z,2431.1,2,2,1012.0881,1013.4113,24,11.364,Food Court
+rmvwocibry0x47t,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:27:54.567Z,2485.6,2,2,1012.0954,1013.4113,24,11.301,Food court
+rmvwocrpf29yazy,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:28:06.723Z,2497.7,2,2,1012.0935,1013.4113,24,11.318,Food court
+rmvwofhdccrqkgu,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:30:13.296Z,2624.3,2,2,1012.0854,1013.4113,24,11.387,Huawei
+rmvwofujmxvic1l,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:30:30.370Z,2641.4,2,2,1012.0927,1013.4113,24,11.325,Huawei
+rmvwog21t2njq6b,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:30:40.097Z,2651.1,2,2,1012.0885,1013.4113,24,11.36,Huawei
+rmvwogbrkvv4u1h,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:30:52.688Z,2663.7,2,2,1012.0907,1013.4113,24,11.342,Huawei
+rmvwoijej28zqdf,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:32:35.899Z,2766.9,2,2,1012.0846,1013.4113,24,11.394,Amouage
+rmvwoitbxxe7gp9,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:32:48.765Z,2779.8,2,2,1012.0959,1013.4113,24,11.297,Amouage
+rmvwoj2x9a10xew,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:33:01.197Z,2792.2,2,2,1012.0992,1013.4113,24,11.269,Amouage
+rmvwol7rnula9zd,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:34:40.787Z,2891.8,2,2,1012.0989,1013.4113,24,11.272,Puma
+rmvwolhvaye8laq,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:34:53.878Z,2904.9,2,2,1012.0989,1013.4113,24,11.272,Puma
+rmvwolqitkn4ro4,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:35:05.093Z,2916.1,2,2,1012.1066,1013.4113,24,11.205,Puma
+rmvwonevv7m5lnf,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:36:23.323Z,2994.3,2,2,1012.1021,1013.4113,24,11.244,Snow Oman
+rmvwonp18l3ppxd,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:36:36.476Z,3007.5,2,2,1012.0996,1013.4113,24,11.265,Snow Oman
+rmvwoo4wj4jpsgh,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:36:57.043Z,3028,2,2,1012.092,1013.4113,24,11.331,Snow Oman
+rmvwopo24wtfnam,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:38:08.524Z,3099.5,2,2,1012.0852,1013.4113,24,11.389,Misk
+rmvwoq36smtv9br,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:38:28.132Z,3119.1,2,2,1012.0815,1013.4113,24,11.421,Misk
+rmvwoqd3twkj1qa,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:38:40.985Z,3132,2,2,1012.0677,1013.4113,24,11.54,Misk
+rmvwoqkjt7j9s39,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:38:50.633Z,3141.6,2,2,1012.0719,1013.4113,24,11.503,Misk
+rmvwoqwqtl11vms,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:39:06.437Z,3157.4,2,2,1012.0743,1013.4113,24,11.483,Misk
+rmvwoslm2yub0v4,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:40:25.322Z,3236.3,2,2,1012.0395,1013.4113,24,11.782,Enza Home
+rmvwot23qyqen4z,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:40:46.694Z,3257.7,2,2,1012.0423,1013.4113,24,11.758,Enza Home
+rmvwou55mdfmb9b,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:41:37.306Z,3308.3,2,2,1012.0352,1013.4113,24,11.819,Khazir
+rmvwoudhovm6iym,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:41:48.108Z,3319.1,2,2,1012.0333,1013.4113,24,11.836,Khazir
+rmvwowgh3tjjc8w,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:43:25.287Z,3416.3,2,2,1012.0192,1013.4113,24,11.957,Rolex
+rmvwows839p102v,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:43:40.515Z,3431.5,2,2,1012.0242,1013.4113,24,11.914,Rolex
+rmvwox0iwbyo8ks,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:43:51.272Z,3442.3,2,2,1012.0242,1013.4113,24,11.913,Rolex
+rmvwoxttmht417y,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:44:29.242Z,3480.2,2,2,1012.0253,1013.4113,24,11.904,Avante
+rmvwoy4nz7stfa1,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:44:43.295Z,3494.3,2,2,1012.0285,1013.4113,24,11.876,Avante
+rmvwp0ui784bnfy,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:46:50.095Z,3621.1,2,2,1012.0098,1013.4113,24,12.037,Samsung
+rmvwp153j8e11hr,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:47:03.823Z,3634.8,2,2,1012.0144,1013.4113,24,11.998,Samsung
+rmvwp3giez8644g,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:48:51.926Z,3742.9,2,2,1012.0107,1013.4113,24,12.03,Emax
+rmvwp3o7071ltil,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:49:01.884Z,3752.9,2,2,1012.0067,1013.4113,24,12.063,Emax
+rmvwp3vsfso4cud,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T17:49:11.727Z,3762.7,2,2,1012.0147,1013.4113,24,11.995,Emax
+rmvwpmkl4lh3myf,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T18:03:43.672Z,4634.7,2,2,1012.2048,1013.4113,24,10.362,Food court
+rmvwpry4qfuprjc,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T18:07:54.506Z,4885.5,2,2,1012.1172,1013.4113,24,11.114,Escalator up
+rmvwptzaiwranrx,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T18:09:29.322Z,4980.3,1,1,1012.8154,1013.4113,24,5.116,Escalator below
+rmvwq3oj5ykjyp7,smvwmv8gcciqbqf,Mall Of Oman,2026-10-31T18:17:01.937Z,5432.9,G,0,1013.4872,1013.4113,24,-0.651,In parking
+rmvwq86kkzoxvfo,smvwq7tcw421hk5,Mall Of Oman,2026-10-31T18:20:31.940Z,17.1,G,0,1013.4894,1013.4925,24,0.027,At Entrance
+rmvy4m9zbmpblhd,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:51:10.343Z,22.6,G,0,1014.1046,1014.1102,24,0.048,Main Entrance
+rmvy4pdslqajq83,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:53:35.253Z,167.6,G,0,1014.0775,1014.1102,24,0.28,IKEA
+rmvy4rbwlhljawo,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:55:06.117Z,258.4,G,0,1014.0773,1014.1102,24,0.282,Max
+rmvy4s7fsezxdhm,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:55:46.984Z,299.3,G,0,1014.0623,1014.1102,24,0.411,LC Wakiki
+rmvy4thkff0w7e1,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:56:46.767Z,359.1,G,0,1014.0493,1014.1102,24,0.522,Off Price
+rmvy4u9s15s2o5o,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:57:23.329Z,395.6,G,0,1014.0444,1014.1102,24,0.564,R&B
+rmvy4uiq3fu96um,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:57:34.923Z,407.2,G,0,1014.0413,1014.1102,24,0.591,R&B
+rmvy4viwaney3kv,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:58:21.802Z,454.1,G,0,1014.0202,1014.1102,24,0.772,Polo Club
+rmvy4wl4sxw2jik,smvy4lsi9ytguew,Avenus Mall,2026-11-01T17:59:11.356Z,503.7,G,0,1014.0037,1014.1102,24,0.913,Mothercare
+rmvy4xy1lbredgw,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:00:14.745Z,567,G,0,1013.9894,1014.1102,24,1.036,H&M
+rmvy4ytgvptb4zv,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:00:55.471Z,607.8,G,0,1013.9671,1014.1102,24,1.227,Kiko
+rmvy4zr4d56j7ha,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:01:39.085Z,651.4,G,0,1013.9764,1014.1102,24,1.148,The Face shop
+rmvy50lkfu2uwnv,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:02:18.543Z,690.8,G,0,1013.9757,1014.1102,24,1.154,Afnan
+rmvy51a5cbfh3e7,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:02:50.400Z,722.7,G,0,1013.9727,1014.1102,24,1.179,Ibraq
+rmvy52e2n5subs3,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:03:42.143Z,774.4,G,0,1013.9696,1014.1102,24,1.206,Arabian Oud
+rmvy53zn7twnygs,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:04:56.755Z,849.1,G,0,1013.9603,1014.1102,24,1.286,LuLu
+rmvy54xu2o1f3ns,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:05:41.066Z,893.4,G,0,1013.9523,1014.1102,24,1.355,LuLu pharmacy
+rmvy566birxer63,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:06:38.718Z,951,G,0,1013.9473,1014.1102,24,1.397,Malabar
+rmvy57fbf3if5jc,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:07:37.035Z,1009.3,G,0,1013.9463,1014.1102,24,1.406,Starbucks
+rmvy581m05uf7dw,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:08:05.928Z,1038.2,G,0,1013.9394,1014.1102,24,1.465,American Eagle
+rmvy58fk0xy91xr,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:08:24.000Z,1056.3,G,0,1013.9362,1014.1102,24,1.492,Katan
+rmvy591ajtqw3w0,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:08:52.171Z,1084.5,G,0,1013.9276,1014.1102,24,1.566,Mumuso
+rmvy5auhpmrj0k0,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:10:16.669Z,1169,G,0,1013.9186,1014.1102,24,1.643,
+rmvy5b9rct6nhfm,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:10:36.456Z,1188.8,G,0,1013.9217,1014.1102,24,1.617,
+rmvy5bkicpo15ff,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:10:50.388Z,1202.7,G,0,1013.9216,1014.1102,24,1.618,
+rmvy5byw1s40r6n,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:11:09.025Z,1221.3,G,0,1013.9177,1014.1102,24,1.651,
+rmvy5cqtgngzw8n,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:11:45.220Z,1257.5,G,0,1013.9252,1014.1102,24,1.587,Escalator below
+rmvy5dj2x21iow2,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:12:21.849Z,1294.2,G,0,1013.2865,1014.1102,24,7.068,Escalator up
+rmvy5dxxi8cwx9v,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:12:41.094Z,1313.4,G,0,1013.2902,1014.1102,24,7.036,Escalator up
+rmvy5eu13x1ty1y,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:13:22.695Z,1355,1,1,1013.3062,1014.1102,24,6.899,Escalator up
+rmvy5frfj3iaat9,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:14:05.984Z,1398.3,1,1,1013.3051,1014.1102,24,6.908,Cinnabon
+rmvy5gj6vk0qyi0,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:14:41.959Z,1434.3,1,1,1013.3045,1014.1102,24,6.913,
+rmvy5gyc8toqtge,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:15:01.592Z,1453.9,1,1,1013.3005,1014.1102,24,6.947,Samsung
+rmvy5hrvjj213ii,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:15:39.871Z,1492.2,1,1,1013.3096,1014.1102,24,6.869,Fashion store
+rmvy5ivn2j454ov,smvy4lsi9ytguew,Avenus Mall,2026-11-01T18:16:31.406Z,1543.7,1,1,1013.3181,1014.1102,24,6.796,Mobile souq
+rmvy5miy8xd3j3a,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:19:21.584Z,17,G,0,1013.9163,1013.9195,24,0.027,Main Entrance
+rmvy5p0b1xthu3q,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:21:17.389Z,132.8,1,1,1013.2717,1013.9195,24,5.559,Matlan
+rmvy5q2e5he4nqj,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:22:06.749Z,182.1,1,1,1013.2638,1013.9195,24,5.626,Salalah gallery
+rmvy5reff3rkjxn,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:23:09.003Z,244.4,1,1,1013.2656,1013.9195,24,5.611,Centrepoint
+rmvy5s20w1l38fx,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:23:39.584Z,275,1,1,1013.2614,1013.9195,24,5.647,Mini sou
+rmvy5t1oqc288b6,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:24:25.802Z,321.2,1,1,1013.2517,1013.9195,24,5.731,SSS
+rmvy5tvb14rkvpn,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:25:04.189Z,359.6,1,1,1013.2523,1013.9195,24,5.726,360
+rmvy5us9ainxmze,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:25:46.894Z,402.3,1,1,1013.2523,1013.9195,24,5.725,Caribou
+rmvy5vozjkw2411,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:26:29.311Z,444.7,1,1,1013.2583,1013.9195,24,5.674,Second cup
+rmvy5wci8suheoq,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:26:59.792Z,475.2,1,1,1013.2653,1013.9195,24,5.614,
+rmvy5wygwzi0hba,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:27:28.256Z,503.6,1,1,1013.2713,1013.9195,24,5.562,Escalator below
+rmvy5xy3p4s96e5,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:28:14.437Z,549.8,2,2,1012.5163,1013.9195,24,12.046,Escalator up
+rmvy5ym48xd7bjo,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:28:45.560Z,580.9,2,2,1012.5161,1013.9195,24,12.047,Food court
+rmvy62ac397mf6a,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:31:36.915Z,752.3,2,2,1012.5048,1013.9195,24,12.145,Pizza hut
+rmvy62v3859szok,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:32:03.812Z,779.2,2,2,1012.4971,1013.9195,24,12.21,Pizza hut
+rmvy63s8nqcitb7,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:32:46.775Z,822.2,2,2,1012.4867,1013.9195,24,12.3,Burger king
+rmvy64lejs7bxa0,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:33:24.571Z,859.9,2,2,1012.4753,1013.9195,24,12.398,KFC
+rmvy659mcmb08vb,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:33:55.956Z,891.3,2,2,1012.4645,1013.9195,24,12.491,
+rmvy65w3swkxknl,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:34:25.096Z,920.5,2,2,1012.4564,1013.9195,24,12.561,Funtazmo
+rmvy66owoyqmwm6,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:35:02.424Z,957.8,2,2,1012.4388,1013.9195,24,12.712,Baskin robins
+rmvy67hvpy2p9lq,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:35:39.973Z,995.4,2,2,1012.4338,1013.9195,24,12.755,
+rmvy688vsvnx25n,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:36:14.968Z,1030.3,2,2,1012.4174,1013.9195,24,12.895,Iraq style
+rmvy69hxbvnpwe7,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:37:13.343Z,1088.7,2,2,1012.4033,1013.9195,24,13.016,Cinema
+rmvy6ad0ixcdzea,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:37:53.634Z,1129,2,2,1012.395,1013.9195,24,13.088,
+rmvy6b8ulcx46z9,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:38:34.893Z,1170.3,2,2,1012.3784,1013.9195,24,13.231,Kidzone
+rmvy6cr0kkhivf0,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:39:45.092Z,1240.5,2,2,1012.3703,1013.9195,24,13.3,Misto
+rmvy6eqw1ef1l3e,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:41:18.241Z,1333.6,2,2,1012.3423,1013.9195,24,13.541,
+rmvy6eyy5ep9ho4,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:41:28.685Z,1344.1,2,2,1012.3546,1013.9195,24,13.435,
+rmvy6gc5jbofdit,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:42:32.455Z,1407.8,2,2,1013.1062,1013.9195,24,6.98,Escalator below
+rmvy6gvkavgu85m,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:42:57.610Z,1433,1,1,1013.103,1013.9195,24,7.007,Escalator below
+rmvy6h1w4kjfgnn,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:43:05.812Z,1441.2,1,1,1013.1027,1013.9195,24,7.01,
+rmvy6hcj6vpf3yu,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:43:19.602Z,1455,1,1,1013.0963,1013.9195,24,7.065,
+rmvy6hrxxpgd4og,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:43:39.573Z,1475,1,1,1013.1045,1013.9195,24,6.994,Escalator up
+rmvy6iqepthtdul,smvy5m5v2f7tb1f,Avenus Mall,2026-11-01T18:44:24.241Z,1519.6,G,0,1013.7405,1013.9195,24,1.536,Escalator below
+rmvy6l5bm5k57rx,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:46:16.882Z,22,G,0,1013.7033,1013.7083,24,0.043,Main Entrance
+rmvy6mcmanf6xru,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:47:12.994Z,78.1,G,0,1013.6999,1013.7083,24,0.072,Escalator up
+rmvy6nsbf67b58y,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:48:19.995Z,145.1,B1,-1,1014.3141,1013.7083,24,-5.196,Escalator below
+rmvy6oesen3vsvy,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:48:49.118Z,174.2,B1,-1,1014.3062,1013.7083,24,-5.129,Vodafone
+rmvy6otpb56glrm,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:49:08.447Z,193.5,B1,-1,1014.2977,1013.7083,24,-5.056,
+rmvy6pcrxn1nukp,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:49:33.165Z,218.2,B1,-1,1014.2901,1013.7083,24,-4.99,
+rmvy6pqip3pbxic,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:49:50.977Z,236,B1,-1,1014.2769,1013.7083,24,-4.877,Foto souq
+rmvy6q7ii7l8xr6,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:50:13.002Z,258.1,B1,-1,1014.272,1013.7083,24,-4.835,Awaser
+rmvy6qpwk7x2b5g,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:50:36.836Z,281.9,B1,-1,1014.2672,1013.7083,24,-4.795,
+rmvy6rbwvncmkr2,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:51:05.359Z,310.4,B1,-1,1014.2531,1013.7083,24,-4.673,Lifts
+rmvy6rsqflzecc5,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:51:27.159Z,332.2,B1,-1,1014.2531,1013.7083,24,-4.673,DHL
+rmvy6sk304g0hzw,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:52:02.604Z,367.7,B1,-1,1014.2505,1013.7083,24,-4.651,Ahli Bank
+rmvy6vcnkk8p396,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:54:12.944Z,498,G,0,1013.6133,1013.7083,24,0.815,Silk route
+rmvy6x7ciny5x6i,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:55:39.378Z,584.4,G,0,1013.6017,1013.7083,24,0.915,
+rmvy6xty8j4im8y,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:56:08.672Z,613.7,G,0,1013.6051,1013.7083,24,0.886,
+rmvy6ymo473k6hx,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:56:45.892Z,651,G,0,1013.6045,1013.7083,24,0.891,
+rmvy6zaaefpq6m0,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:57:16.502Z,681.6,G,0,1013.6027,1013.7083,24,0.906,
+rmvy6zwfkb1nb3a,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:57:45.200Z,710.3,G,0,1013.6051,1013.7083,24,0.885,
+rmvy70nvi0mn6m8,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T18:58:20.766Z,745.8,G,0,1013.6042,1013.7083,24,0.893,
+rmvy75uwpt1wu3j,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T19:02:23.161Z,988.2,G,0,1013.5694,1013.7083,24,1.192,
+rmvy7c07idu6inf,smvy6kodw0i6pm3,Avenus Mall,2026-11-01T19:07:09.966Z,1275,G,0,1013.4883,1013.7083,24,1.888,
+rmw9lvktswqmo5g,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:39:45.712Z,19.8,G,0,1013.8683,1013.8726,24,0.037,At entrance
+rmw9lwoqovhjv9s,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:40:37.440Z,71.6,G,0,1013.8804,1013.8726,24,-0.067,Samsung
+rmw9lxmux0hx28o,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:41:21.657Z,115.8,G,0,1013.8772,1013.8726,24,-0.039,R&B
+rmw9lyyj15mdsui,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:42:23.437Z,177.6,G,0,1013.8765,1013.8726,24,-0.034,Damas
+rmw9lzlgbg4tlvc,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:42:53.147Z,207.3,G,0,1013.882,1013.8726,24,-0.08,HyperMax
+rmw9m0r885ay1s1,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:43:47.288Z,261.4,G,0,1013.8815,1013.8726,24,-0.077,Doctor.M
+rmw9m1k7u65rh3b,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:44:24.858Z,299,G,0,1013.8945,1013.8726,24,-0.188,Skechers
+rmw9m2rp497nbsx,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:45:21.208Z,355.3,G,0,1013.8985,1013.8726,24,-0.222,Redtag
+rmw9m3jk3vhvvj9,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:45:57.315Z,391.4,G,0,1013.8924,1013.8726,24,-0.17,Food Court
+rmw9m44c28kjawm,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:46:24.242Z,418.4,G,0,1013.8914,1013.8726,24,-0.161,Papa johns
+rmw9m50vta0eyhd,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:47:06.425Z,460.6,G,0,1013.8875,1013.8726,24,-0.128,Vox Cinema
+rmw9m6n4s0gjivd,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:48:21.916Z,536.1,G,0,1013.8921,1013.8726,24,-0.167,Brands for less
+rmw9m7u9ow09ekm,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:49:17.820Z,592,G,0,1013.9016,1013.8726,24,-0.249,Centrepoint
+rmw9m8s6e6elwsl,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:50:01.766Z,635.9,G,0,1013.902,1013.8726,24,-0.252,Daiso
+rmw9m9n8paizaot,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:50:42.025Z,676.2,G,0,1013.8974,1013.8726,24,-0.213,Escalator below
+rmw9macl94ufmlp,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:51:14.877Z,709,1,1,1013.2184,1013.8726,24,5.614,Escalator Up
+rmw9mathu0czag5,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:51:36.786Z,730.9,1,1,1013.196,1013.8726,24,5.806,Emax
+rmw9mcr7y35ie9f,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:53:07.150Z,821.3,1,1,1013.8875,1013.8726,24,-0.128,Mothercare
+rmw9md0hlutl2p9,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:53:19.161Z,833.3,G,0,1013.889,1013.8726,24,-0.141,Mothercare
+rmw9mdqdujlx5cr,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:53:52.722Z,866.9,G,0,1013.8963,1013.8726,24,-0.203,Lc wakiki
+rmw9mebsu2qgza2,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:54:20.478Z,894.6,G,0,1013.8986,1013.8726,24,-0.223,Paul
+rmw9mfg8wr51w9k,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:55:12.896Z,947,G,0,1013.8868,1013.8726,24,-0.121,Huawei
+rmw9mh871lyh1va,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:56:35.773Z,1029.9,G,0,1013.8889,1013.8726,24,-0.14,Escalator below
+rmw9mhx2cy7amjq,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:57:08.004Z,1062.1,1,1,1013.186,1013.8726,24,5.892,Escalator up
+rmw9mikvpvmrm0d,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:57:38.869Z,1093,1,1,1013.1629,1013.8726,24,6.091,Habib Beirut
+rmw9mj7maf91l7f,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:58:08.338Z,1122.5,1,1,1013.1683,1013.8726,24,6.044,Buffalo wild wings
+rmw9mjoozgenwq9,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:58:30.467Z,1144.6,1,1,1013.1722,1013.8726,24,6.011,Fun tazmo
+rmw9mkwc9d1zq3j,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:59:27.033Z,1201.2,1,1,1013.1817,1013.8726,24,5.929,Nando’s
+rmw9mlfbemoy9z3,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T18:59:51.626Z,1225.8,1,1,1013.1797,1013.8726,24,5.946,Escalator up
+rmw9mm5x0e89be9,smw9lv5ijbefa9h,City Center Seeb,2026-11-09T19:00:26.100Z,1260.2,G,0,1013.9055,1013.8726,24,-0.283,Escalator below
+rmw9mp5stwibgby,smw9moub26a34zr,City Center Seeb,2026-11-09T19:02:45.917Z,14.9,G,0,1013.9176,1013.9186,24,0.009,Off price
+rmw9mqqgbechw06,smw9moub26a34zr,City Center Seeb,2026-11-09T19:03:59.339Z,88.3,G,0,1013.9252,1013.9186,24,-0.056,MontBlanc
+rmw9ms11ygeco0a,smw9moub26a34zr,City Center Seeb,2026-11-09T19:04:59.734Z,148.7,G,0,1013.9295,1013.9186,24,-0.093,Tim Hortons
+rmw9mt8mqeefy6h,smw9moub26a34zr,City Center Seeb,2026-11-09T19:05:56.210Z,205.2,G,0,1013.9231,1013.9186,24,-0.038,Hiloa
+rmw9mu5u1s1hfi8,smw9moub26a34zr,City Center Seeb,2026-11-09T19:06:39.241Z,248.2,G,0,1013.9243,1013.9186,24,-0.049,Barista Cafe
+rmw9mvxpxut2zmr,smw9moub26a34zr,City Center Seeb,2026-11-09T19:08:02.037Z,331,G,0,1013.9245,1013.9186,24,-0.051,Vincci
+rmw9mwkxvivh4o1,smw9moub26a34zr,City Center Seeb,2026-11-09T19:08:32.131Z,361.1,G,0,1013.9245,1013.9186,24,-0.05,Optic center
+rmw9my60b7uqs8n,smw9moub26a34zr,City Center Seeb,2026-11-09T19:09:46.091Z,435.1,G,0,1013.9154,1013.9186,24,0.027,G-Shock
+rmw9mytrmehegph,smw9moub26a34zr,City Center Seeb,2026-11-09T19:10:16.882Z,465.9,G,0,1013.9129,1013.9186,24,0.049,American eagle
+rmw9mzcfma6u6ws,smw9moub26a34zr,City Center Seeb,2026-11-09T19:10:41.074Z,490.1,G,0,1013.9218,1013.9186,24,-0.027,Escalator below
+rmw9n07iuuqtzz7,smw9moub26a34zr,City Center Seeb,2026-11-09T19:11:21.366Z,530.3,1,1,1013.2247,1013.9186,24,5.955,Escalator up
+rmw9n10norpb77m,smw9moub26a34zr,City Center Seeb,2026-11-09T19:11:59.124Z,568.1,1,1,1013.228,1013.9186,24,5.927,Parking
+rmw9n1k72caznvk,smw9moub26a34zr,City Center Seeb,2026-11-09T19:12:24.446Z,593.4,1,1,1013.2147,1013.9186,24,6.04,Atrium
+rmw9n1zpeqy1crd,smw9moub26a34zr,City Center Seeb,2026-11-09T19:12:44.546Z,613.5,1,1,1013.2171,1013.9186,24,6.02,Escalator up
+rmw9n2v5l1l2z3u,smw9moub26a34zr,City Center Seeb,2026-11-09T19:13:25.305Z,654.3,1,1,1013.8927,1013.9186,24,0.222,Escalator below
+rmw9n390v0zilw2,smw9moub26a34zr,City Center Seeb,2026-11-09T19:13:43.279Z,672.3,G,0,1013.9133,1013.9186,24,0.045,Escalator below
+rmw9n5w9octjg55,smw9moub26a34zr,City Center Seeb,2026-11-09T19:15:46.716Z,795.7,G,0,1013.8847,1013.9186,24,0.291,Istyle

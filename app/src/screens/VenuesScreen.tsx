@@ -48,6 +48,10 @@ export function VenuesScreen() {
                   <Muted>
                     {v.city}, {v.country} · {v.floors.length} floors ({sorted[0]?.label} to {sorted[sorted.length - 1]?.label}) · {n} reading(s)
                   </Muted>
+                  <Muted>
+                    {v.boundary ? `Auto: boundary ${Math.round(v.boundary.radiusM)} m` : 'Auto: no mall boundary'} · entrance floor{' '}
+                    {v.floors.find((f) => f.index === (v.entranceFloorIndex ?? 0))?.label ?? v.entranceFloorIndex ?? 0}
+                  </Muted>
                 </Pressable>
                 <View style={s.actions}>
                   <Button title="Edit" variant="secondary" onPress={() => setEditing(v)} style={{ flex: 1 }} />

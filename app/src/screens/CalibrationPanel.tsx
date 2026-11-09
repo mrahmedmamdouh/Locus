@@ -89,6 +89,7 @@ export function CalibrationPanel(props: { initialVenueId: string | null; onCance
         osRelAltBaselineM: res.osRelAltBaselineM,
         sensorEpoch: res.sensorEpoch,
         demo: settings.demoMode,
+        autoMode: settings.autoMode,
       };
       upsertSession(session);
       setActiveSession(session.id);

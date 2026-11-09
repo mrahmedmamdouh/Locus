@@ -25,7 +25,7 @@ export async function exportWifiScansCsv(scans: WifiScan[]): Promise<string> {
   return shareCsv(wifiScansToCsv(scans), wifiScansFileName(new Date()), 'Export Locus Wi-Fi scans');
 }
 
-async function shareCsv(csv: string, name: string, dialogTitle: string): Promise<string> {
+export async function shareCsv(csv: string, name: string, dialogTitle: string): Promise<string> {
   if (Platform.OS === 'web') {
     downloadOnWeb(csv, name);
     return name;

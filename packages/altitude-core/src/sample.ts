@@ -1,3 +1,4 @@
+import { createDriftTracker } from './drift';
 import { buildUniformFloors, classifyFloor, floorCenterM } from './floors';
 import { relativeAltitudeFromPressure } from './pressure';
 import type { Reading } from './types';
@@ -46,6 +47,12 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
       const tempC = 24;
       const driftPerMin = (rand() - 0.5) * 0.004; // hPa per minute of weather drift
       let seconds = 30;
+      // Automatic mode: a geofence baseline taken 20 s after the manual one while walking in
+      // through the doors (slightly off), corrected by floor snapping. Uses no random numbers,
+      // so the manual columns are unchanged by it.
+      const autoBaseline = baseline + 0.03;
+      const autoAtSec = 20;
+      const tracker = createDriftTracker({ floors: venue.floors });
       for (const floor of venue.floors) {
         for (let k = 0; k < perFloor; k++) {
           seconds += 20 + Math.floor(rand() * 40);
@@ -54,6 +61,11 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
           const pressure = ideal + (seconds / 60) * driftPerMin + (gauss(rand) * device.baroNoise) / 8.7;
           const baro = relativeAltitudeFromPressure(pressure, baseline, tempC);
           const gpsRel = trueZ + gauss(rand) * device.gpsNoise;
+          const autoRel = relativeAltitudeFromPressure(pressure, autoBaseline, tempC);
+          const tMs = seconds * 1000;
+          tracker.update({ tMs, relAltM: autoRel });
+          tracker.update({ tMs: tMs + 4000, relAltM: autoRel });
+          const auto = tracker.update({ tMs: tMs + 8000, relAltM: autoRel });
           out.push({
             id: `s${++id}`,
             sessionId,
@@ -84,6 +96,13 @@ export function generateSampleReadings(seed = 42, perFloor = 12): Reading[] {
             wifiScanStatus: device.platform === 'android' ? 'ok' : 'unsupported',
             wifiApCount: null, // filled by generateSampleWifiScans
             notes: 'synthetic',
+            autoCalibrationSource: 'geofence-foreground',
+            autoCalibratedAt: new Date(Date.UTC(2026, 9, 27, 10, 0, autoAtSec)).toISOString(),
+            autoBaselinePressureHpa: round(autoBaseline, 3),
+            minutesSinceAutoCalibration: round((seconds - autoAtSec) / 60, 2),
+            autoRelAltM: round(autoRel, 3),
+            autoDriftOffsetM: round(auto.offsetM, 3),
+            autoEstFloorIndex: auto.floorIndex,
           });
         }
       }

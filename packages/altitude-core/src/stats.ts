@@ -3,8 +3,16 @@ import type { AltitudeSource, Reading } from './types';
 
 /** Altitude estimate for a reading from the chosen source (meters relative to entrance). */
 export function altitudeFor(r: Reading, source: AltitudeSource): number | null {
-  const v = source === 'baro' ? r.baroRelAltM : source === 'gps' ? r.gpsRelAltM : r.osRelAltM;
-  return v === null || !Number.isFinite(v) ? null : v;
+  let v: number | null | undefined;
+  if (source === 'auto') {
+    // Automatic mode: raw height vs the geofence baseline minus the floor-snapping drift offset.
+    const raw = r.autoRelAltM;
+    const off = r.autoDriftOffsetM;
+    v = raw === null || raw === undefined ? null : raw - (off !== null && off !== undefined && Number.isFinite(off) ? off : 0);
+  } else {
+    v = source === 'baro' ? r.baroRelAltM : source === 'gps' ? r.gpsRelAltM : r.osRelAltM;
+  }
+  return v === null || v === undefined || !Number.isFinite(v) ? null : v;
 }
 
 /**
@@ -17,13 +25,19 @@ export function floorHeightFor(r: Reading, fallbackM: number): number {
 }
 
 /**
- * Whether the estimated floor matches the true floor. Baro and GPS use the
- * floor estimated on the phone; the iOS OS altimeter has no stored estimate,
+ * Whether the estimated floor matches the true floor. Baro, GPS and auto use the
+ * floor estimated on the phone (auto: `autoEstFloorIndex`); the iOS OS altimeter has no stored estimate,
  * so it counts as correct when within half of the true floor's height.
  */
 function floorCorrect(r: Reading, source: AltitudeSource, fallbackFloorM: number): boolean | null {
   if (source === 'baro') return r.estFloorIndexBaro === null ? null : r.estFloorIndexBaro === r.trueFloorIndex;
   if (source === 'gps') return r.estFloorIndexGps === null ? null : r.estFloorIndexGps === r.trueFloorIndex;
+  if (source === 'auto') {
+    // Readings with an automatic height but no floor (off the table) count as wrong.
+    if (altitudeFor(r, source) === null) return null;
+    const est = r.autoEstFloorIndex;
+    return est !== null && est !== undefined && est === r.trueFloorIndex;
+  }
   const alt = altitudeFor(r, source);
   return alt === null ? null : Math.abs(alt - r.trueFloorCenterM) < floorHeightFor(r, fallbackFloorM) / 2;
 }
