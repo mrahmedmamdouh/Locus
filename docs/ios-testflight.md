@@ -67,6 +67,29 @@ Apple then processes the build for 10–30 minutes before it appears in TestFlig
 | `Ensuring your app exists on App Store Connect… Apple ID:` | `ascAppId` is missing from `app/eas.json` (it is set to `6827325977`). Press Ctrl+C; the build continues. |
 | `App Store Connect rejected the API authentication credentials` on submit | The key stored on Expo's servers is wrong. Submit with the local key as above, or fix it in `npx eas-cli@latest credentials -p ios` → production → App Store Connect API Key. |
 
+## Publishing 0.4.0 (what differs from 0.3.1)
+
+0.4.0 adds a new package (`expo-task-manager`), background geofencing with **Always** location, and the barometer permission. The steps above still apply, with three changes:
+
+1. **Install packages after pulling.** Run `npm ci` in the repo root (not in `app/`) before building:
+   ```bash
+   cd ~/Locus && git pull && npm ci && cd app
+   ```
+   Skipping it gives `Unable to resolve module expo-task-manager` (or a similar "module not found") in the build log.
+2. **No new Apple capability is needed.** The build's Info.plist now has `UIBackgroundModes` = `location` (from `expo-location`) and `fetch` (added automatically by `expo-task-manager`'s plugin). Background modes are Info.plist keys, not entitlements, and EAS only syncs capabilities from entitlements, so the App ID and provisioning profile do not change. If `eas build` still asks to sync capabilities or to regenerate the provisioning profile, answer **Yes**; it is harmless. Do not set `EXPO_NO_CAPABILITY_SYNC`.
+3. **On the iPhone, allow Always location.** Background location is requested only when Auto mode is switched on. If iOS offers only "While Using", later choose **Change to Always Allow**, or set Settings → Locus Field → Location → **Always**, with **Precise Location** on. Also allow Motion & Fitness for the barometer.
+
+**Check the iPhone has it:** in TestFlight, the Locus Field page shows **Version 0.4.0 (build number)**. The build number is set by EAS and is higher than 0.3.1's.
+
+| Problem | Fix |
+| --- | --- |
+| Build log: `Unable to resolve module expo-task-manager` | Run `npm ci` in the repo root, then build again. |
+| `Provisioning profile ... doesn't include ...` / profile out of date | `npx eas-cli@latest credentials -p ios` → production → Provisioning Profile → remove it, then build again and let EAS create a new one. |
+| Submit fails with an authentication error | Make sure the five `export` lines ran in this same Terminal window, then rerun the `node -e` step and submit. |
+| TestFlight shows **Missing Compliance** | Should not happen (`usesNonExemptEncryption: false` in `app.json`). If it does: open the build → Manage → choose "None of the algorithms mentioned above" → Save. |
+
+Internal testing of 0.4.0 needs no Apple review. Only external testing or an App Store release is reviewed; see [ios-app-store-release.md](ios-app-store-release.md).
+
 ## Install on your iPhone
 
 1. In App Store Connect → your app → **TestFlight** → Internal Testing, create a group and add yourself (and up to 100 team members with App Store Connect access). Internal testing needs no Apple review.
