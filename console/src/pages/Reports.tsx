@@ -48,6 +48,10 @@ export function Reports({ api }: { api: Api }) {
               <strong>{s.offers.reduce((a, o) => a + o.delivered, 0).toLocaleString()}</strong>
             </div>
             <div className="stat">
+              <span className="muted small">Opted in to mall offers (now)</span>
+              <strong>{s.consent.optedIn.toLocaleString()}</strong>
+            </div>
+            <div className="stat">
               <span className="muted small">Offers opened</span>
               <strong>{s.offers.reduce((a, o) => a + o.opened, 0).toLocaleString()}</strong>
             </div>

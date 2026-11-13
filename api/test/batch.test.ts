@@ -113,6 +113,8 @@ async function setup() {
     return { status: res.status, json: text ? JSON.parse(text) : null };
   };
   const t = await call('POST', '/v1/platform/tenants', PLATFORM_KEY, { id: 'bank-a', name: 'Bank A', country: 'OM' });
+  // Consent is tested in consent.test.ts.
+  await call('PATCH', '/v1/admin/settings', t.json.keys.secret, { consentMode: 'bank' });
   await call('POST', '/v1/platform/malls/mall-of-oman/stores', PLATFORM_KEY, {
     stores: [
       { id: 'moo-costa', name: 'Costa Coffee', floorIndex: 1 },

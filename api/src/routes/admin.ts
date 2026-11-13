@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { sha256Hex } from '../auth';
+import { erasureStatements, mayProcess } from '../consent';
 import type { Db, SqlValue } from '../db';
 import { AUTO_LINK, matchStores, type MatchCandidate } from '../match';
 import {
@@ -81,6 +82,7 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
     webhookSecretSet: !!t.webhook_secret,
     quietHours: t.quiet_start && t.quiet_end ? { start: t.quiet_start, end: t.quiet_end } : null,
     maxPushesPerDay: t.max_pushes_per_day,
+    consentMode: t.consent_mode,
   });
 
   admin.get('/settings', async (c) => c.json({ settings: settingsJson(await tenantOf(c.get('tenantId'))) }));
@@ -110,13 +112,15 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
       }
     }
     const max = b.maxPushesPerDay === undefined ? cur.max_pushes_per_day : int(b.maxPushesPerDay, 'maxPushesPerDay', 1, 20);
-    await db.run('UPDATE tenants SET timezone = ?, delivery_mode = ?, webhook_url = ?, quiet_start = ?, quiet_end = ?, max_pushes_per_day = ? WHERE id = ?', [
+    const consentMode = b.consentMode === undefined ? cur.consent_mode : oneOf(b.consentMode, 'consentMode', ['sdk', 'bank'] as const);
+    await db.run('UPDATE tenants SET timezone = ?, delivery_mode = ?, webhook_url = ?, quiet_start = ?, quiet_end = ?, max_pushes_per_day = ?, consent_mode = ? WHERE id = ?', [
       timezone,
       deliveryMode,
       webhookUrl,
       quietStart,
       quietEnd,
       max,
+      consentMode,
       cur.id,
     ]);
     return c.json({ settings: settingsJson(await tenantOf(cur.id)) });
@@ -615,6 +619,7 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
     const b = await readBody(c);
     if (!Array.isArray(b.transactions) || b.transactions.length === 0 || b.transactions.length > 1000) throw bad('transactions must be an array of 1–1000 purchases.');
     const t = now();
+    const consentMode = (await tenantOf(tenantId)).consent_mode;
     let matched = 0;
     let duplicates = 0;
     let unmatched = 0;
@@ -633,9 +638,11 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
         unmatched++;
         continue;
       }
-      const installs = installId
+      const candidates = installId
         ? [installId]
         : (await db.all<{ install_id: string }>('SELECT install_id FROM installs WHERE tenant_id = ? AND customer_ref = ?', [tenantId, customerRef])).map((r) => r.install_id);
+      const installs: string[] = [];
+      for (const id of candidates) if (await mayProcess(db, tenantId, consentMode, id)) installs.push(id);
       if (!installs.length) {
         unmatched++;
         continue;
@@ -658,6 +665,83 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
       else duplicates++;
     }
     return c.json({ received: b.transactions.length, matched, duplicates, unmatched });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // Consent records and erasure
+  // ---------------------------------------------------------------------------------------------
+
+  /** Consent history of one customer (customerRef) or install, newest first: for audits and customer requests. */
+  admin.get('/consents', async (c) => {
+    const tenantId = c.get('tenantId');
+    const installId = c.req.query('installId');
+    const customerRef = c.req.query('customerRef');
+    if (!installId && !customerRef) throw bad('Give installId or customerRef.');
+    const installs = installId
+      ? [installId]
+      : [
+          ...new Set(
+            (
+              await db.all<{ install_id: string }>(
+                'SELECT install_id FROM consents WHERE tenant_id = ? AND customer_ref = ? UNION SELECT install_id FROM installs WHERE tenant_id = ? AND customer_ref = ?',
+                [tenantId, customerRef!, tenantId, customerRef!],
+              )
+            ).map((r) => r.install_id),
+          ),
+        ];
+    const rows = installs.length
+      ? await db.all<{ install_id: string; customer_ref: string | null; status: string; policy_version: string; text_hash: string | null; language: string | null; platform: string | null; source: string; t: string; received_at: string }>(
+          `SELECT install_id, customer_ref, status, policy_version, text_hash, language, platform, source, t, received_at FROM consents WHERE tenant_id = ? AND install_id IN (${inList(installs.length)}) ORDER BY id DESC LIMIT 500`,
+          [tenantId, ...installs],
+        )
+      : [];
+    return c.json({
+      installs,
+      records: rows.map((r) => ({
+        installId: r.install_id,
+        customerRef: r.customer_ref,
+        status: r.status,
+        policyVersion: r.policy_version,
+        textHash: r.text_hash,
+        language: r.language,
+        platform: r.platform,
+        source: r.source,
+        t: r.t,
+        receivedAt: r.received_at,
+      })),
+    });
+  });
+
+  /** Erase what Locus holds about a customer (all their installs) or one install. Consent records stay as proof. */
+  admin.post('/customers/forget', async (c) => {
+    const tenantId = c.get('tenantId');
+    const b = await readBody(c);
+    const installId = optStr(b.installId, 'installId', { max: 64, pattern: INSTALL_ID_PATTERN });
+    const customerRef = optStr(b.customerRef, 'customerRef', { max: 128 });
+    if (!installId && !customerRef) throw bad('Give installId or customerRef.');
+    const installs = installId
+      ? [installId]
+      : [
+          ...new Set(
+            (
+              await db.all<{ install_id: string }>(
+                'SELECT install_id FROM installs WHERE tenant_id = ? AND customer_ref = ? UNION SELECT install_id FROM consents WHERE tenant_id = ? AND customer_ref = ?',
+                [tenantId, customerRef!, tenantId, customerRef!],
+              )
+            ).map((r) => r.install_id),
+          ),
+        ];
+    const t = now().toISOString();
+    if (installs.length) {
+      await db.batch([
+        ...erasureStatements(tenantId, installs),
+        ...installs.map((id) => ({
+          sql: "INSERT INTO consents (tenant_id, install_id, customer_ref, purpose, status, policy_version, source, t, received_at) VALUES (?, ?, ?, 'mall_offers', 'withdrawn', 'erasure', 'erasure', ?, ?)",
+          params: [tenantId, id, customerRef, t, t] as SqlValue[],
+        })),
+      ]);
+    }
+    return c.json({ erasedInstalls: installs.length });
   });
 
   // ---------------------------------------------------------------------------------------------
@@ -698,6 +782,12 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
       range,
     );
     const webhooks = await db.all<{ status: string; n: number }>('SELECT status, COUNT(*) AS n FROM webhook_deliveries WHERE tenant_id = ? AND created_at >= ? AND created_at < ? GROUP BY status', range);
+    // Installs whose latest consent record is "granted" now, and choices recorded in the period.
+    const consentNow = await db.first<{ granted: number; withdrawn: number }>(
+      `SELECT SUM(CASE WHEN status = 'granted' THEN 1 ELSE 0 END) AS granted, SUM(CASE WHEN status = 'withdrawn' THEN 1 ELSE 0 END) AS withdrawn
+       FROM consents c WHERE tenant_id = ? AND id = (SELECT MAX(id) FROM consents c2 WHERE c2.tenant_id = c.tenant_id AND c2.install_id = c.install_id)`,
+      [tenantId],
+    );
     const label = await floorLabels(db, byFloor.map((f) => f.mall_id));
     const rate = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 1000 : null);
     return c.json({
@@ -728,6 +818,7 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
         };
       }),
       webhooks: Object.fromEntries(webhooks.map((w) => [w.status, Number(w.n)])),
+      consent: { optedIn: Number(consentNow?.granted ?? 0), optedOut: Number(consentNow?.withdrawn ?? 0) },
     });
   });
 

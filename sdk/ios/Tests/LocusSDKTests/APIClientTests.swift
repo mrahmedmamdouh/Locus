@@ -97,6 +97,22 @@ final class APIClientTests: XCTestCase {
         wait(for: [done], timeout: 5)
     }
 
+    func testConsentRecordIsSentWithTextHashOnly() {
+        StubProtocol.handler = { _ in (200, Data(#"{"recorded":true,"status":"granted"}"#.utf8)) }
+        let done = expectation(description: "consent")
+        let r = LocusAPIClient.ConsentRecord(status: "granted", policyVersion: "mall-offers-2026-11", textHash: String(repeating: "a", count: 64), language: "ar", t: "2026-11-14T00:00:00.000Z")
+        client().sendConsent(r, installId: "install-0001", customerRef: "cust-1") { result in
+            if case .failure = result { XCTFail("expected success") }
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+        let body = try! JSONSerialization.jsonObject(with: StubProtocol.lastBody!) as! [String: Any]
+        XCTAssertEqual(body["status"] as? String, "granted")
+        XCTAssertEqual(body["policyVersion"] as? String, "mall-offers-2026-11")
+        XCTAssertEqual(body["platform"] as? String, "ios")
+        XCTAssertEqual((body["textHash"] as? String)?.count, 64)
+    }
+
     func testPrivacyManifestShipsWithTheSDK() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/LocusSDK/PrivacyInfo.xcprivacy")

@@ -123,6 +123,19 @@ export interface Settings {
   webhookSecretSet: boolean;
   quietHours: { start: string; end: string } | null;
   maxPushesPerDay: number;
+  consentMode: 'sdk' | 'bank';
+}
+export interface ConsentRecord {
+  installId: string;
+  customerRef: string | null;
+  status: 'granted' | 'withdrawn';
+  policyVersion: string;
+  textHash: string | null;
+  language: string | null;
+  platform: string | null;
+  source: string;
+  t: string;
+  receivedAt: string;
 }
 export interface Delivery {
   id: string;
@@ -152,6 +165,7 @@ export interface Summary {
     liftPts: number | null;
   }[];
   webhooks: Partial<Record<'pending' | 'sent' | 'failed' | 'expired', number>>;
+  consent: { optedIn: number; optedOut: number };
 }
 
 export class ApiError extends Error {
@@ -205,6 +219,9 @@ export class Api {
   updateSettings = (s: Partial<Omit<Settings, 'webhookSecretSet'>>) => this.req<{ settings: Settings }>('PATCH', '/v1/admin/settings', s).then((r) => r.settings);
   newWebhookSecret = () => this.req<{ secret: string }>('POST', '/v1/admin/settings/webhook-secret', {}).then((r) => r.secret);
   testWebhook = () => this.req<{ ok: boolean; status: number; error?: string }>('POST', '/v1/admin/settings/webhook-test', {});
+  consents = (q: { installId?: string; customerRef?: string }) =>
+    this.req<{ installs: string[]; records: ConsentRecord[] }>('GET', `/v1/admin/consents?${new URLSearchParams(q as Record<string, string>).toString()}`);
+  forgetCustomer = (q: { installId?: string; customerRef?: string }) => this.req<{ erasedInstalls: number }>('POST', '/v1/admin/customers/forget', q);
   deliveries = () => this.req<{ deliveries: Delivery[] }>('GET', '/v1/admin/deliveries').then((r) => r.deliveries);
   summary = (from: string, to: string) => this.req<Summary>('GET', `/v1/admin/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
 }

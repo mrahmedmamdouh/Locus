@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { Api, Settings as S } from '../api';
+import type { Api, ConsentRecord, Settings as S } from '../api';
 import { useLoad } from './useLoad';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -30,6 +30,7 @@ export function Settings({ api }: { api: Api }) {
         quietHours: quiet ? (form.quietHours ?? { start: '22:00', end: '08:00' }) : null,
         webhookUrl: form.webhookUrl?.trim() || null,
         deliveryMode: form.deliveryMode,
+        consentMode: form.consentMode,
       });
       s.setData(saved);
       setMsg({ ok: true, text: 'Saved.' });
@@ -96,6 +97,21 @@ export function Settings({ api }: { api: Api }) {
           </div>
         )}
 
+        <h3>Consent</h3>
+        <label className="check">
+          <input type="radio" checked={form.consentMode === 'sdk'} onChange={() => setForm({ ...form, consentMode: 'sdk' })} />
+          <span>
+            <strong>Recorded through the SDK</strong> (recommended). Your app shows the opt-in and calls setConsent; Locus keeps who agreed, when and to which wording, and serves
+            nothing to customers who have not agreed.
+          </span>
+        </label>
+        <label className="check">
+          <input type="radio" checked={form.consentMode === 'bank'} onChange={() => setForm({ ...form, consentMode: 'bank' })} />
+          <span>
+            <strong>Recorded by the bank.</strong> Your own systems hold the consent and your app starts the SDK only after it. Locus still logs any consent the SDK sends.
+          </span>
+        </label>
+
         <h3>Delivery</h3>
         <label className="check">
           <input type="radio" checked={form.deliveryMode === 'sdk'} onChange={() => setForm({ ...form, deliveryMode: 'sdk' })} />
@@ -133,6 +149,8 @@ export function Settings({ api }: { api: Api }) {
         </div>
       </form>
 
+      <ConsentLookup api={api} />
+
       {deliveries.data && deliveries.data.length > 0 && (
         <div className="card">
           <h3>Recent webhook deliveries</h3>
@@ -163,5 +181,95 @@ export function Settings({ api }: { api: Api }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Look up a customer's consent history and erase their data (customer requests, audits). */
+function ConsentLookup({ api }: { api: Api }) {
+  const [q, setQ] = useState('');
+  const [result, setResult] = useState<{ installs: string[]; records: ConsentRecord[] } | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const query = () => (q.trim().startsWith('install-') || /^[0-9a-f-]{36}$/.test(q.trim()) ? { installId: q.trim() } : { customerRef: q.trim() });
+
+  const find = async (e: FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    try {
+      setResult(await api.consents(query()));
+    } catch (err) {
+      setMsg(errText(err));
+    }
+  };
+
+  const erase = async () => {
+    if (!window.confirm(`Erase all Locus data of ${q.trim()}? Visits, offers and purchases are deleted; the consent trail stays as proof.`)) return;
+    try {
+      const r = await api.forgetCustomer(query());
+      setMsg(`Erased ${r.erasedInstalls} app install(s).`);
+      setResult(await api.consents(query()));
+    } catch (err) {
+      setMsg(errText(err));
+    }
+  };
+
+  return (
+    <div className="card">
+      <h3>Consent records</h3>
+      <p className="muted small">Find a customer by your customer reference (or an install id) to see what they agreed to, and erase their data on request.</p>
+      <form className="row wrap" onSubmit={find}>
+        <label className="grow">
+          Customer reference or install id
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="cust-7f3a" required />
+        </label>
+        <button className="secondary align-end">Look up</button>
+      </form>
+      {msg && <p className="note">{msg}</p>}
+      {result && (
+        <>
+          {result.records.length === 0 ? (
+            <p className="muted">No consent records.</p>
+          ) : (
+            <div className="table-wrap flat">
+              <table>
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Choice</th>
+                    <th>Wording</th>
+                    <th>Install</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.records.map((r, i) => (
+                    <tr key={i}>
+                      <td className="small">{new Date(r.t).toLocaleString()}</td>
+                      <td>
+                        <span className={`badge ${r.status === 'granted' ? 'live' : 'paused'}`}>{r.status === 'granted' ? 'agreed' : 'withdrew'}</span>
+                      </td>
+                      <td className="small">
+                        {r.policyVersion}
+                        {r.language ? ` · ${r.language}` : ''}
+                        {r.textHash && <div className="muted">text {r.textHash.slice(0, 12)}…</div>}
+                      </td>
+                      <td className="small muted">
+                        {r.installId.slice(0, 13)}
+                        {r.platform ? ` · ${r.platform}` : ''}
+                      </td>
+                      <td className="small">{r.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {result.installs.length > 0 && (
+            <button className="danger" onClick={erase} style={{ marginTop: 12 }}>
+              Erase this customer’s data
+            </button>
+          )}
+        </>
+      )}
+    </div>
   );
 }

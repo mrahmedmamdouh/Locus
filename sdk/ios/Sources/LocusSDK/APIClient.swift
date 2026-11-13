@@ -2,6 +2,8 @@ import Foundation
 
 public enum LocusError: Error, Equatable {
     case notConfigured
+    /// The customer has not agreed to mall offers (see `Locus.setConsent`).
+    case noConsent
     case http(status: Int, code: String?, message: String?)
     case transport(String)
     case decoding(String)
@@ -90,6 +92,36 @@ public final class LocusAPIClient {
         }
         let body = try? JSONEncoder().encode(Body(q: q))
         request("POST", "v1/sdk/offers", body: body, completion: completion)
+    }
+
+    struct ConsentRecord: Codable, Equatable {
+        let status: String
+        let policyVersion: String
+        let textHash: String?
+        let language: String
+        let t: String
+    }
+
+    func sendConsent(_ r: ConsentRecord, installId: String, customerRef: String?, completion: @escaping (Result<Void, LocusError>) -> Void) {
+        struct Body: Encodable {
+            let installId: String
+            let customerRef: String?
+            let status: String
+            let policyVersion: String
+            let textHash: String?
+            let language: String
+            let platform = "ios"
+            let t: String
+        }
+        struct Ok: Decodable { let recorded: Bool }
+        let body = try? JSONEncoder().encode(Body(installId: installId, customerRef: customerRef, status: r.status, policyVersion: r.policyVersion, textHash: r.textHash, language: r.language, t: r.t))
+        request("POST", "v1/sdk/consent", body: body) { (res: Result<Ok, LocusError>) in completion(res.map { _ in () }) }
+    }
+
+    func forget(installId: String, completion: @escaping (Result<Void, LocusError>) -> Void) {
+        struct Ok: Decodable { let erased: Bool }
+        let body = try? JSONEncoder().encode(["installId": installId])
+        request("POST", "v1/sdk/forget", body: body) { (res: Result<Ok, LocusError>) in completion(res.map { _ in () }) }
     }
 
     func send(events: [LocusEvent], installId: String, platform: String, completion: @escaping (Result<Void, LocusError>) -> Void) {

@@ -39,6 +39,16 @@ internal class Store(context: Context) {
         get() = prefs.getString("segments", null)?.let { s -> runCatching { JSONArray(s).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrNull() } ?: emptyList()
         set(v) = prefs.edit().putString("segments", JSONArray(v).toString()).apply()
 
+    /** The customer's latest choice about mall offers, as recorded on this device. */
+    var consent: ApiClient.ConsentRecord?
+        get() = prefs.getString("consent", null)?.let { runCatching { ApiClient.ConsentRecord.fromJson(JSONObject(it)) }.getOrNull() }
+        set(v) = prefs.edit().putString("consent", v?.toJson()?.toString()).apply()
+
+    /** True while the latest consent record has not reached the API yet. */
+    var consentPending: Boolean
+        get() = prefs.getBoolean("consentPending", false)
+        set(v) = prefs.edit().putBoolean("consentPending", v).apply()
+
     var running: Boolean
         get() = prefs.getBoolean("running", false)
         set(v) = prefs.edit().putBoolean("running", v).apply()

@@ -1,6 +1,7 @@
 import { haversineM } from '@locus/altitude-core';
 import { Hono } from 'hono';
 import type { SqlValue } from '../db';
+import { erasureStatements, mayProcess } from '../consent';
 import { inHoldout } from '../holdout';
 import { FLOOR_REPEAT_MS, rankOffers } from '../ranking';
 import {
@@ -23,7 +24,7 @@ import { inQuietHours, localClock } from '../time';
 import { ApiError, bad, ID_PATTERN, INSTALL_ID_PATTERN, isoTime, num, obj, oneOf, optInt, optStr, str } from '../validate';
 import { attemptDelivery, WEBHOOK_TTL_MS, type OfferReadyPayload } from '../webhook';
 
-export type PushReason = 'list' | 'ok' | 'no-offers' | 'floor-already-notified' | 'quiet-hours' | 'daily-limit' | 'daily-cap-reached' | 'holdout';
+export type PushReason = 'no-consent' | 'list' | 'ok' | 'no-offers' | 'floor-already-notified' | 'quiet-hours' | 'daily-limit' | 'daily-cap-reached' | 'holdout';
 
 /** The SDK routes (publishable key, called from the bank's app). */
 export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<void>) => Promise<void>) {
@@ -70,6 +71,10 @@ export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<vo
     const mall = await db.first<MallRow>("SELECT * FROM malls WHERE id = ? AND status = 'pilot'", [mallId]);
     if (!mall) throw new ApiError(404, 'not_found', 'Unknown mall.');
     const tenant = (await db.first<TenantRow>('SELECT * FROM tenants WHERE id = ?', [tenantId]))!;
+    // No consent for mall offers: nothing is stored and nothing is offered.
+    if (!(await mayProcess(db, tenantId, tenant.consent_mode, installId))) {
+      return c.json({ mallId, floorIndex, language: locale === 'ar' ? 'ar' : 'en', offers: [], push: null, delivery: null, reason: 'no-consent' as PushReason });
+    }
     const t = now();
     const tIso = t.toISOString();
     await db.run(
@@ -250,6 +255,8 @@ export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<vo
     const installId = str(b.installId, 'installId', { min: 8, max: 64, pattern: INSTALL_ID_PATTERN });
     const platform = b.platform === undefined ? null : oneOf(b.platform, 'platform', ['ios', 'android'] as const);
     if (!Array.isArray(b.events) || b.events.length === 0 || b.events.length > 50) throw bad('events must be an array of 1–50 events.');
+    const mode = (await db.first<{ consent_mode: 'sdk' | 'bank' }>('SELECT consent_mode FROM tenants WHERE id = ?', [tenantId]))!.consent_mode;
+    if (!(await mayProcess(db, tenantId, mode, installId))) throw new ApiError(403, 'consent_required', 'This install has not agreed to mall offers; events are not accepted.');
     const t = now();
     const received = t.toISOString();
     const offerIds = new Set<string>();
@@ -272,6 +279,47 @@ export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<vo
     }
     await db.batch(rows.map((params) => ({ sql: 'INSERT INTO events (tenant_id, install_id, type, mall_id, floor_index, offer_id, platform, t, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', params })));
     return c.json({ accepted: rows.length });
+  });
+
+  /**
+   * Records the customer's choice about mall offers (append-only). Withdrawing stops processing at
+   * once; the SDK also stops monitoring. Data already collected stays until erased (/forget).
+   */
+  sdk.post('/consent', async (c) => {
+    const tenantId = c.get('tenantId');
+    const b = await readBody(c);
+    const installId = str(b.installId, 'installId', { min: 8, max: 64, pattern: INSTALL_ID_PATTERN });
+    const status = oneOf(b.status, 'status', ['granted', 'withdrawn'] as const);
+    const policyVersion = str(b.policyVersion, 'policyVersion', { max: 64, pattern: /^[A-Za-z0-9._:-]+$/ });
+    const textHash = optStr(b.textHash, 'textHash', { max: 64, pattern: /^[0-9a-f]{64}$/ });
+    const customerRef = optStr(b.customerRef, 'customerRef', { max: 128, pattern: /^[A-Za-z0-9._:-]+$/ });
+    const language = b.language === undefined || b.language === null ? null : oneOf(b.language, 'language', ['en', 'ar'] as const);
+    const platform = b.platform === undefined || b.platform === null ? null : oneOf(b.platform, 'platform', ['ios', 'android'] as const);
+    const t = now();
+    const at = b.t === undefined ? t.toISOString() : isoTime(b.t, 't');
+    if (Math.abs(Date.parse(at) - t.getTime()) > 7 * 86_400_000) throw bad('t must be within 7 days of now.');
+    await db.run(
+      "INSERT INTO consents (tenant_id, install_id, customer_ref, purpose, status, policy_version, text_hash, language, platform, source, t, received_at) VALUES (?, ?, ?, 'mall_offers', ?, ?, ?, ?, ?, 'app', ?, ?)",
+      [tenantId, installId, customerRef, status, policyVersion, textHash, language, platform, at, t.toISOString()],
+    );
+    return c.json({ recorded: true, status });
+  });
+
+  /** "Delete my data": erases this install's events, purchases and profile; consent records stay as proof. */
+  sdk.post('/forget', async (c) => {
+    const tenantId = c.get('tenantId');
+    const b = await readBody(c);
+    const installId = str(b.installId, 'installId', { min: 8, max: 64, pattern: INSTALL_ID_PATTERN });
+    const t = now().toISOString();
+    const last = await db.first<{ policy_version: string }>("SELECT policy_version FROM consents WHERE tenant_id = ? AND install_id = ? ORDER BY id DESC LIMIT 1", [tenantId, installId]);
+    await db.batch([
+      ...erasureStatements(tenantId, [installId]),
+      {
+        sql: "INSERT INTO consents (tenant_id, install_id, purpose, status, policy_version, source, t, received_at) VALUES (?, ?, 'mall_offers', 'withdrawn', ?, 'erasure', ?, ?)",
+        params: [tenantId, installId, last?.policy_version ?? 'unknown', t, t],
+      },
+    ]);
+    return c.json({ erased: true });
   });
 
   return sdk;

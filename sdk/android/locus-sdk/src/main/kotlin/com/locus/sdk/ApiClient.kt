@@ -12,6 +12,7 @@ import java.util.concurrent.Executors
 
 sealed class LocusError(message: String) : Exception(message) {
     object NotConfigured : LocusError("Locus is not configured. Call Locus.configure first.")
+    object NoConsent : LocusError("The customer has not agreed to mall offers. Call Locus.setConsent first.")
     class Http(val status: Int, val code: String?, message: String?) : LocusError("HTTP $status ${code ?: ""} ${message ?: ""}".trim())
     class Transport(message: String) : LocusError(message)
     class Decoding(message: String) : LocusError(message)
@@ -94,6 +95,25 @@ class ApiClient(
         q.customerRef?.let { body.put("customerRef", it) }
         if (q.listOnly) body.put("mode", "list")
         request("POST", "v1/sdk/offers", body, { LocusOffersResponse.fromJson(JSONObject(it)) }, done)
+    }
+
+    data class ConsentRecord(val status: String, val policyVersion: String, val textHash: String?, val language: String, val t: String) {
+        internal fun toJson(): JSONObject = JSONObject().put("status", status).put("policyVersion", policyVersion)
+            .put("textHash", textHash ?: JSONObject.NULL).put("language", language).put("t", t)
+
+        internal companion object {
+            fun fromJson(o: JSONObject) = ConsentRecord(o.getString("status"), o.getString("policyVersion"), o.optStringOrNull("textHash"), o.getString("language"), o.getString("t"))
+        }
+    }
+
+    fun sendConsent(r: ConsentRecord, installId: String, customerRef: String?, done: (Result<Unit>) -> Unit) {
+        val body = r.toJson().put("installId", installId).put("platform", "android")
+        customerRef?.let { body.put("customerRef", it) }
+        request("POST", "v1/sdk/consent", body, { }, done)
+    }
+
+    fun forget(installId: String, done: (Result<Unit>) -> Unit) {
+        request("POST", "v1/sdk/forget", JSONObject().put("installId", installId), { }, done)
     }
 
     fun sendEvents(events: List<LocusEvent>, installId: String, done: (Result<Unit>) -> Unit) {

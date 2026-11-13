@@ -43,10 +43,16 @@ data class LocusOptions(
     val backgroundFloorTracking: Boolean = false,
     /** Post a notification for the offer the API says to show (when the listener does not decline it). */
     val postLocalNotifications: Boolean = false,
+    /**
+     * True when your bank records consent in its own systems (Locus console: consent mode "bank") and
+     * only starts the SDK afterwards. False (default): call [Locus.setConsent] first; [Locus.start] needs it.
+     */
+    val consentManagedByBank: Boolean = false,
 ) {
     internal fun toJson(): JSONObject = JSONObject()
         .put("apiBaseUrl", apiBaseUrl).put("maxMonitoredMalls", maxMonitoredMalls)
         .put("backgroundFloorTracking", backgroundFloorTracking).put("postLocalNotifications", postLocalNotifications)
+        .put("consentManagedByBank", consentManagedByBank)
 
     internal companion object {
         fun fromJson(o: JSONObject) = LocusOptions(
@@ -54,6 +60,7 @@ data class LocusOptions(
             maxMonitoredMalls = o.optInt("maxMonitoredMalls", 30),
             backgroundFloorTracking = o.optBoolean("backgroundFloorTracking", false),
             postLocalNotifications = o.optBoolean("postLocalNotifications", false),
+            consentManagedByBank = o.optBoolean("consentManagedByBank", false),
         )
     }
 }
@@ -123,6 +130,10 @@ object Locus {
             listener?.onError(LocusError.NotConfigured)
             return
         }
+        if (options?.consentManagedByBank != true && !consentGranted) {
+            listener?.onError(LocusError.NoConsent)
+            return
+        }
         s.running = true
         registerGeofences()
         checkWhereWeAre()
@@ -146,6 +157,42 @@ object Locus {
     fun reset() {
         stop()
         store?.clearAll()
+    }
+
+    /** Whether the customer's latest recorded choice is "yes" to mall offers. */
+    val consentGranted: Boolean get() = store?.consent?.status == "granted"
+
+    /**
+     * Records the customer's choice about mall offers, with your version label of the wording and,
+     * ideally, the exact text shown (only its SHA-256 is sent). "No" stops monitoring at once.
+     * The record reaches Locus now, or with the next upload if offline.
+     */
+    fun setConsent(granted: Boolean, policyVersion: String, shownText: String? = null) {
+        val s = store ?: return listener?.onError(LocusError.NotConfigured) ?: Unit
+        val hash = shownText?.let { text ->
+            java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        }
+        s.consent = ApiClient.ConsentRecord(if (granted) "granted" else "withdrawn", policyVersion, hash, resolvedLanguage(), LocusEvent.isoNow())
+        s.consentPending = true
+        if (!granted) {
+            stop()
+            s.queue = emptyList()
+        }
+        flush()
+    }
+
+    /**
+     * "Delete my data": asks Locus to erase this install's data, then clears the SDK's storage (the
+     * next install id is new). Consent records stay with Locus as proof.
+     */
+    fun forgetMe(done: (Result<Unit>) -> Unit) {
+        val a = api
+        val s = store
+        if (a == null || s == null) return done(Result.failure(LocusError.NotConfigured))
+        a.forget(s.installId) { r ->
+            if (r.isSuccess) reset()
+            done(r)
+        }
     }
 
     fun offersHere(done: (Result<LocusOffersResponse>) -> Unit) {
@@ -479,6 +526,22 @@ object Locus {
         val a = api ?: return
         val s = store ?: return
         if (flushing) return
+        // The consent record goes first: the API refuses events without it.
+        val record = s.consent
+        if (s.consentPending && record != null) {
+            flushing = true
+            a.sendConsent(record, s.installId, s.customerRef) { r ->
+                flushing = false
+                r.onSuccess {
+                    if (s.consent == record) s.consentPending = false
+                    flush()
+                }.onFailure { e ->
+                    if (e is LocusError.Http && e.status == 400) s.consentPending = false
+                    listener?.onError(e)
+                }
+            }
+            return
+        }
         val batch = s.queue.take(50)
         if (batch.isEmpty()) return
         flushing = true

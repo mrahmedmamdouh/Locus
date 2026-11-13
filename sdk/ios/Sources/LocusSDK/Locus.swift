@@ -1,6 +1,7 @@
 #if os(iOS)
 import CoreLocation
 import CoreMotion
+import CryptoKit
 import Foundation
 import LocusCore
 import UIKit
@@ -20,6 +21,9 @@ public struct LocusOptions {
     /// Your app must have notification permission.
     public var postLocalNotifications: Bool = false
     public var engineConfig: EngineConfig = EngineConfig()
+    /// True when your bank records consent in its own systems (Locus console: consent mode "bank") and
+    /// only starts the SDK afterwards. False (default): call `setConsent` first; `start` needs it.
+    public var consentManagedByBank: Bool = false
 
     public init(apiBaseURL: URL) {
         self.apiBaseURL = apiBaseURL
@@ -99,6 +103,10 @@ public final class Locus: NSObject {
             delegate?.locus(self, didFailWith: LocusError.notConfigured)
             return
         }
+        guard options?.consentManagedByBank == true || consentGranted else {
+            delegate?.locus(self, didFailWith: LocusError.noConsent)
+            return
+        }
         isRunning = true
         updateMonitoredRegions(checkState: true)
         refreshMallsIfNeeded(force: store.malls.isEmpty)
@@ -117,10 +125,39 @@ public final class Locus: NSObject {
         currentPlace = nil
     }
 
-    /// Removes everything the SDK stored on the device, including the install id (for "delete my data").
+    /// Removes everything the SDK stored on the device, including the install id.
     public func reset() {
         stop()
         store.clearAll()
+    }
+
+    // MARK: - Consent
+
+    /// Whether the customer's latest recorded choice is "yes" to mall offers.
+    public var consentGranted: Bool { store.consent?.status == "granted" }
+
+    /// Records the customer's choice about mall offers, with your version label of the wording and,
+    /// ideally, the exact text shown (only its SHA-256 is sent). "No" stops monitoring at once.
+    /// The record reaches Locus now, or with the next upload if offline.
+    public func setConsent(granted: Bool, policyVersion: String, shownText: String? = nil) {
+        let hash = shownText.map { SHA256.hash(data: Data($0.utf8)).map { String(format: "%02x", $0) }.joined() }
+        store.consent = LocusAPIClient.ConsentRecord(status: granted ? "granted" : "withdrawn", policyVersion: policyVersion, textHash: hash, language: resolvedLanguage, t: LocusEvent.iso.string(from: Date()))
+        store.consentPending = true
+        if !granted {
+            stop()
+            store.queue = []
+        }
+        flush()
+    }
+
+    /// "Delete my data": asks Locus to erase this install's data, then clears the SDK's storage
+    /// (the next install id is new). Consent records stay with Locus as proof.
+    public func forgetMe(completion: @escaping (Result<Void, LocusError>) -> Void) {
+        guard let api = api else { return completion(.failure(.notConfigured)) }
+        api.forget(installId: store.installId) { [weak self] result in
+            if case .success = result { self?.reset() }
+            completion(result)
+        }
     }
 
     /// Offers here for an in-app list (not only the one to push).
@@ -310,6 +347,23 @@ public final class Locus: NSObject {
 
     private func flush() {
         guard let api = api, !flushing else { return }
+        // The consent record goes first: the API refuses events without it.
+        if store.consentPending, let record = store.consent {
+            flushing = true
+            api.sendConsent(record, installId: store.installId, customerRef: store.customerRef) { [weak self] result in
+                guard let self = self else { return }
+                self.flushing = false
+                switch result {
+                case .success:
+                    if self.store.consent == record { self.store.consentPending = false }
+                    self.flush()
+                case let .failure(e):
+                    if case let .http(status, _, _) = e, status == 400 { self.store.consentPending = false }
+                    self.delegate?.locus(self, didFailWith: e)
+                }
+            }
+            return
+        }
         let batch = Array(store.queue.prefix(50))
         guard !batch.isEmpty else { return }
         flushing = true

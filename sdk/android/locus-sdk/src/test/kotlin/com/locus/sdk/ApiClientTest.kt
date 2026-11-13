@@ -99,6 +99,20 @@ class ApiClientTest {
     }
 
     @Test
+    fun consentRecordIsSentWithTextHashOnly() {
+        reply = 200 to """{"recorded":true,"status":"granted"}"""
+        val rec = ApiClient.ConsentRecord("granted", "mall-offers-2026-11", "a".repeat(64), "ar", "2026-11-14T00:00:00.000Z")
+        val r = await<Unit> { client().sendConsent(rec, "install-0001", "cust-1", it) }
+        assertTrue(r.isSuccess)
+        val body = JSONObject(seen.single().third)
+        assertEquals("POST /v1/sdk/consent", seen.single().first)
+        assertEquals("granted", body.getString("status"))
+        assertEquals("android", body.getString("platform"))
+        assertEquals("cust-1", body.getString("customerRef"))
+        assertEquals(rec, ApiClient.ConsentRecord.fromJson(JSONObject(rec.toJson().toString())))
+    }
+
+    @Test
     fun eventsNeverContainCoordinates() {
         val keys = LocusEvent("floor", "mall-of-oman", 1).toJson().keys().asSequence().toSet()
         assertEquals(setOf("type", "mallId", "floorIndex", "t"), keys)

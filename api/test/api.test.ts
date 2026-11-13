@@ -24,6 +24,8 @@ async function setup() {
   };
   const created = await call('POST', '/v1/platform/tenants', PLATFORM_KEY, { id: 'bank-a', name: 'Bank A', country: 'OM' });
   const other = await call('POST', '/v1/platform/tenants', PLATFORM_KEY, { id: 'bank-b', name: 'Bank B', country: 'OM' });
+  // These tests cover offers and reports; consent is tested in consent.test.ts.
+  for (const t of [created, other]) await call('PATCH', '/v1/admin/settings', t.json.keys.secret, { consentMode: 'bank' });
   return { db, app, call, pub: created.json.keys.publishable as string, sec: created.json.keys.secret as string, otherSec: other.json.keys.secret as string, otherPub: other.json.keys.publishable as string };
 }
 

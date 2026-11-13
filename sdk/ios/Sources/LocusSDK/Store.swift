@@ -61,12 +61,24 @@ final class LocusStore {
         set { defaults.set(newValue, forKey: "segments") }
     }
 
+    /// The customer's latest choice about mall offers, as recorded on this device.
+    var consent: LocusAPIClient.ConsentRecord? {
+        get { load("consent") }
+        set { save(newValue, "consent") }
+    }
+
+    /// True while the latest consent record has not reached the API yet.
+    var consentPending: Bool {
+        get { defaults.bool(forKey: "consentPending") }
+        set { defaults.set(newValue, forKey: "consentPending") }
+    }
+
     var queue: [LocusEvent] {
         get { load("queue") ?? [] }
         set { save(Array(newValue.suffix(LocusStore.maxQueuedEvents)), "queue") }
     }
 
     func clearAll() {
-        for k in ["installId", "malls", "mallsFetchedAt", "snapshot", "queue", "customerRef", "segments"] { defaults.removeObject(forKey: k) }
+        for k in ["installId", "malls", "mallsFetchedAt", "snapshot", "queue", "customerRef", "segments", "consent", "consentPending"] { defaults.removeObject(forKey: k) }
     }
 }
