@@ -18,7 +18,11 @@ Send keys as `Authorization: Bearer <key>`. Keys are stored only as SHA-256 hash
 | --- | --- | --- |
 | `GET /v1/sdk/malls` | `lat`, `lon` (rough), `limit` (≤ 100) | Pilot malls nearest first, each with `boundary {lat, lon, radiusM}`, `entranceFloorIndex` and `floors [{index, label, zMinM, zMaxM}]` |
 | `POST /v1/sdk/offers` | `installId`, `mallId`, `floorIndex` (null = unknown), and optionally `customerRef`, `segments` (tags), `locale` (`en`/`ar`), `platform`, `mode: "list"` (in-app list: no push decision) | `offers` (ranked), `push` (the one to show now, or null), `delivery` (`sdk`: the app shows it; `webhook`: sent to the bank's server) and `reason` |
-| `POST /v1/sdk/events` | `installId`, `platform`, `events: [{type, mallId, floorIndex?, offerId?, t}]` (1–50) | `{accepted}`. Types: `arrived`, `floor`, `left`, `offer_delivered`, `offer_opened`, `offer_dismissed`. Extra fields such as coordinates are dropped. |
+| `POST /v1/sdk/consent` | `installId`, `status` (`granted`/`withdrawn`), `policyVersion`, optional `textHash` (SHA-256 of the wording shown), `customerRef`, `language`, `platform`, `t` | `{recorded}`. Append-only. |
+| `POST /v1/sdk/forget` | `installId` | `{erased}`: deletes the install's events, purchases and profile; consent records stay as proof. |
+| `POST /v1/sdk/events` | `installId`, `platform`, `events: [{type, mallId, floorIndex?, offerId?, t}]` (1–50) | `{accepted}`. Refused with 403 `consent_required` without consent. Types: `arrived`, `floor`, `left`, `offer_delivered`, `offer_opened`, `offer_dismissed`. Extra fields such as coordinates are dropped. |
+
+**Consent.** With the client's consent mode `sdk` (the default), Locus serves nothing and stores nothing for an install whose latest consent record is not `granted`: `/offers` answers `reason: "no-consent"`, `/events` answers 403. With mode `bank`, the bank records consent in its own systems and only starts the SDK afterwards.
 
 **Which offers and which push** ([`routes/sdk.ts`](../api/src/routes/sdk.ts), [`ranking.ts`](../api/src/ranking.ts)). The checks run in this order; the first that stops a push becomes the `reason`:
 
@@ -77,6 +81,12 @@ Locus-Signature: t=1795000000,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>
 - `POST /v1/admin/settings/webhook-secret` returns a new signing secret **once**.
 - `POST /v1/admin/settings/webhook-test` sends a signed `ping`.
 - `GET /v1/admin/deliveries?status=` lists the last 100 webhook deliveries.
+
+**Consent and erasure**
+
+- `GET /v1/admin/consents?customerRef=` or `?installId=` returns the consent history, newest first: when, agreed or withdrew, wording version and hash, platform and source (`app`, `erasure`).
+- `POST /v1/admin/customers/forget {customerRef | installId}` erases all of a customer's installs (customer requests); the consent trail stays.
+- Settings: `consentMode` (`sdk` | `bank`). Reports: `consent {optedIn, optedOut}` (installs whose latest record is each).
 
 **Catalogue and merchants**
 
@@ -159,28 +169,34 @@ Run the console against it with `npm run dev --workspace console` (http://localh
 
 ## Deploy to Cloudflare (free tier)
 
-One time, from the repo root on your Mac:
+**One command, from your Mac** (Node 22+, the repo cloned). It needs your own Cloudflare login, which is why it runs on your computer:
 
 ```bash
-cd api
-npx wrangler login                                   # opens the browser
-npx wrangler d1 create locus                         # copy the database_id it prints
-#   → paste it into api/wrangler.toml (database_id = "…")
-npx wrangler d1 migrations apply locus --remote      # creates tables and the 3 pilot malls
-openssl rand -hex 32                                 # your platform key; keep it in a password manager
-echo -n '<platform key>' | shasum -a 256             # its SHA-256
-npx wrangler secret put PLATFORM_KEY_SHA256          # paste the hash
-npx wrangler deploy                                  # prints https://locus-api.<you>.workers.dev
+cd ~/Locus && git pull && npm ci
+npm run setup:cloudflare --workspace api -- --catalogue ~/Downloads/malls.csv ~/Downloads/stores.csv
 ```
 
-Then:
+What it does:
 
-1. Create the first client with `POST /v1/platform/tenants`, as in the local example but against the workers.dev address.
-2. Import the catalogue with `LOCUS_API_URL` set to that address.
-3. Set the repository variable `LOCUS_API_URL` (Settings → Secrets and variables → Actions → Variables) so the console's sign-in page fills in the address.
-4. Keep `CONSOLE_ORIGINS` in `wrangler.toml` set to the console's origin (`https://mrahmedmamdouh.github.io`).
+1. Signs you in to Cloudflare (a browser window opens; a free account is enough).
+2. Creates the D1 database `locus` and writes its id into `api/wrangler.toml`.
+3. Applies the migrations, which create the tables and the three pilot malls.
+4. Deploys the Worker and prints its address (`https://locus-api.<your-subdomain>.workers.dev`). The first time, Cloudflare asks you to pick a workers.dev subdomain.
+5. Creates the platform key, stores only its SHA-256 as a Worker secret, and saves the key at once to `~/locus-api-keys-<date>.txt` (readable only by you).
+6. Checks `/health`.
+7. Creates the first client, `demo-bank` by default (`--client-id`, `--client-name`, `--client-country`), and prints its publishable and secret keys.
+8. Imports the places catalogue from the two CSV files.
 
-Webhook retries run every minute from the cron trigger in `wrangler.toml`. Later schema changes: add `api/migrations/000N_*.sql`, then `npx wrangler d1 migrations apply locus --remote` and `npx wrangler deploy`.
+It is safe to run again. It reuses the database, applies new migrations and redeploys. It keeps the platform key unless you pass `--rotate-platform-key`. To create clients or import on a later run, put `LOCUS_PLATFORM_KEY=<key>` in front of the command.
+
+After the first run:
+
+- Commit `api/wrangler.toml` (it now holds the database id).
+- Optional: set the repository variable `LOCUS_API_URL` so the console's sign-in page fills in the address.
+- Optional: set `LOCUS_DEMO_PUBLISHABLE_KEY` so the demo app builds come with the key.
+- Optional, for automatic deploys from GitHub: add the repository secrets `CLOUDFLARE_API_TOKEN` (Cloudflare → My Profile → API Tokens → "Edit Cloudflare Workers" template, plus D1 Edit) and `CLOUDFLARE_ACCOUNT_ID`. The **Deploy API to Cloudflare** workflow then applies migrations and deploys on every change to `api/`. Without them it skips with a notice.
+
+Webhook retries run every minute from the cron trigger in `wrangler.toml`. The deployment was checked on the local Workers runtime with D1 (`wrangler dev`): migrations, catalogue import, consent, offers, events, purchases, reports and erasure.
 
 ## Limits of the pilot setup
 

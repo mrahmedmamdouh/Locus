@@ -126,6 +126,26 @@ After the customer grants fine location and then background location, call `Locu
 
 Phones without a pressure sensor (for example the Samsung A72 used in the field tests) get **mall-level** offers: arrival works the same, `place.floor` stays `null`, and the API only returns offers you set for the whole mall.
 
+## Consent first
+
+Mall offers need the customer's "yes". Show your own opt-in, with your wording in Arabic and English, then record the answer:
+
+```swift
+Locus.shared.setConsent(granted: true, policyVersion: "mall-offers-2026-11", shownText: textShownToTheCustomer)
+Locus.shared.start()
+```
+
+```kotlin
+Locus.setConsent(true, "mall-offers-2026-11", textShownToTheCustomer)
+Locus.start()
+```
+
+- **What Locus keeps:** who agreed, when, to which version, and a SHA-256 of the exact text shown. The record is append-only and is kept as proof even after erasure. It is sent at once, or with the next upload if the phone is offline.
+- **Without consent:** `start()` fails with `noConsent` / `NoConsent`, the API serves no offers, and it refuses events.
+- **"No" or "withdraw"** (`setConsent(false, …)`) stops monitoring at once and drops unsent events.
+- **"Delete my data":** `Locus.shared.forgetMe { … }` (iOS) or `Locus.forgetMe { … }` (Android) erases the install's data at Locus and on the phone. The bank can also erase a customer by reference from the console (Settings → Consent records).
+- **If the bank records consent itself** (in its terms or its own consent system), set the client's consent mode to "bank" in the console and `consentManagedByBank = true` in the SDK options. Then start the SDK only for customers who agreed.
+
 ## Customer, segments, language and push delivery
 
 Call these after sign-in, and again when they change (the SDK keeps them on the device):
@@ -162,6 +182,10 @@ The iOS SDK ships `PrivacyInfo.xcprivacy`. It declares:
 - `UserDefaults` access with reason `CA92.1`.
 
 Xcode merges it into your app's privacy report. Your App Store privacy answers should match it.
+
+## Demo bank app
+
+A working example of everything above for both platforms, used for QA and field tests: see [demo-app.md](demo-app.md).
 
 ## Testing without going to a mall
 
