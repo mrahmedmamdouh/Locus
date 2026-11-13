@@ -1,0 +1,59 @@
+name: Android SDK
+
+on:
+  push:
+    branches: [main]
+    paths: ['sdk/android/**', 'sdk/spec/**', '.github/workflows/sdk-android.yml']
+  pull_request:
+    paths: ['sdk/android/**', 'sdk/spec/**', '.github/workflows/sdk-android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Kotlin tests (shared vectors) and AAR build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sdk/android
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Engine tests (JVM, shared vectors)
+        run: ./gradlew --no-daemon :locus-core:test
+
+      - name: SDK unit tests
+        run: ./gradlew --no-daemon :locus-sdk:testDebugUnitTest
+
+      - name: Build the AAR
+        run: ./gradlew --no-daemon :locus-sdk:assembleRelease
+
+      - name: Test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: sdk/android/**/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Upload AARs
+        uses: actions/upload-artifact@v7
+        with:
+          name: locus-android-sdk
+          path: |
+            sdk/android/locus-sdk/build/outputs/aar/*.aar
+            sdk/android/locus-core/build/libs/*.jar

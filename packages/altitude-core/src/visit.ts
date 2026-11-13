@@ -1,5 +1,5 @@
 import { createDriftTracker, type DriftTracker } from './drift';
-import { classifyFloor, floorCenterM } from './floors';
+import { floorCenterM } from './floors';
 import { G0, R_DRY_AIR, relativeAltitudeFromPressure } from './pressure';
 import { median } from './smoothing';
 import type { Floor, VenueBoundary } from './types';

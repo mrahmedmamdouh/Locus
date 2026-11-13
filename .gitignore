@@ -21,3 +21,8 @@ web-build/
 *.mobileprovision
 *.sqlite
 .wrangler/
+/sdk/android/.gradle/
+/sdk/android/**/build/
+/sdk/android/local.properties
+/.build/
+/.swiftpm/
