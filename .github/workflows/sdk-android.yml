@@ -40,7 +40,7 @@ jobs:
         run: ./gradlew --no-daemon :locus-sdk:testDebugUnitTest
 
       - name: Build the AAR
-        run: ./gradlew --no-daemon :locus-sdk:assembleRelease
+        run: ./gradlew --no-daemon :locus-sdk:assembleRelease :demo-app:assembleDebug
 
       - name: Test reports on failure
         if: failure()

@@ -1,0 +1,74 @@
+name: Demo bank app (Android)
+
+# Builds the Locus Demo Bank APK (uses the Android SDK) and publishes it as a GitHub Release.
+# Repository variables LOCUS_API_URL and LOCUS_DEMO_PUBLISHABLE_KEY, if set, are baked in as the
+# app's defaults (a publishable key is meant to live inside apps); the app also lets you type them.
+
+on:
+  push:
+    branches: [main]
+    paths: ['sdk/android/**', '.github/workflows/demo-android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # create the GitHub Release
+    defaults:
+      run:
+        working-directory: sdk/android
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build the demo APK
+        env:
+          LOCUS_API_URL: ${{ vars.LOCUS_API_URL }}
+          LOCUS_DEMO_PUBLISHABLE_KEY: ${{ vars.LOCUS_DEMO_PUBLISHABLE_KEY }}
+          DEMO_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew --no-daemon :demo-app:assembleDebug
+
+      - name: Name the APK
+        id: apk
+        run: |
+          name="locus-demo-bank-0.1.0-build${GITHUB_RUN_NUMBER}.apk"
+          cp demo-app/build/outputs/apk/debug/demo-app-debug.apk "$name"
+          echo "name=sdk/android/$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: locus-demo-bank-apk
+          path: ${{ steps.apk.outputs.name }}
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ github.workspace }}/${{ steps.apk.outputs.name }}
+        run: |
+          tag="demo-bank-v0.1.0-build${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" "$APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Locus Demo Bank 0.1.0 (Android build ${GITHUB_RUN_NUMBER})" \
+            --notes "Demo bank app using the Locus Android SDK, built from ${GITHUB_SHA}.
+
+          Install: open this page on the Android phone, download the APK and allow installs from this source.
+          Then enter the API address and the publishable key (from the Cloudflare setup), agree to mall offers, allow location (all the time) and notifications, and tap Start.
+          Debug-signed: for testing only."
