@@ -1,0 +1,45 @@
+# Locus Demo Bank for iPhone. Generate the Xcode project with XcodeGen:
+#   brew install xcodegen
+#   cd sdk/ios/DemoBank && xcodegen && open DemoBank.xcodeproj
+# Then pick your team under Signing & Capabilities and run it on your iPhone.
+name: DemoBank
+options:
+  bundleIdPrefix: com.locus
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+packages:
+  Locus:
+    path: ../../..
+targets:
+  DemoBank:
+    type: application
+    platform: iOS
+    sources:
+      - DemoBank
+    dependencies:
+      - package: Locus
+        product: LocusSDK
+    info:
+      path: DemoBank/Info.plist
+      properties:
+        CFBundleDisplayName: Locus Demo Bank
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSLocationWhenInUseUsageDescription: To show your card offers in the mall you are visiting.
+        NSLocationAlwaysAndWhenInUseUsageDescription: To tell you about card offers when you arrive at a partner mall, even when the app is closed.
+        NSMotionUsageDescription: To tell which floor of the mall you are on, so offers match the shops around you.
+        LOCUSDefaultAPIURL: $(LOCUS_API_URL)
+        LOCUSDefaultPublishableKey: $(LOCUS_DEMO_PUBLISHABLE_KEY)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.locus.demobank
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
+        LOCUS_API_URL: ""
+        LOCUS_DEMO_PUBLISHABLE_KEY: ""

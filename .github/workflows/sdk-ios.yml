@@ -33,3 +33,10 @@ jobs:
 
       - name: Build the SDK for iOS (simulator)
         run: xcodebuild build -scheme LocusSDK -destination 'generic/platform=iOS Simulator' -quiet
+
+      - name: Build the demo bank app (simulator)
+        run: |
+          brew install xcodegen
+          cd sdk/ios/DemoBank
+          xcodegen generate
+          xcodebuild build -project DemoBank.xcodeproj -scheme DemoBank -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO -quiet
