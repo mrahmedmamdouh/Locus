@@ -5,6 +5,8 @@ import { Merchants } from './pages/Merchants';
 import { Offers } from './pages/Offers';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { Operator } from './pages/Operator';
+import { PlatformApi } from './operator';
 
 type Tab = 'offers' | 'merchants' | 'malls' | 'reports' | 'settings';
 const TABS: { id: Tab; label: string }[] = [
@@ -18,6 +20,8 @@ const SESSION_KEY = 'locus-console-session';
 const DEFAULT_API = (import.meta.env.VITE_LOCUS_API_URL as string | undefined) ?? '';
 
 interface Session {
+  /** 'bank': a client's secret key; 'operator': the Locus platform key. */
+  role?: 'bank' | 'operator';
   apiUrl: string;
   key: string;
   tenantName: string;
@@ -44,14 +48,23 @@ function saveSession(s: Session | null) {
 export function App() {
   const [session, setSession] = useState<Session | null>(loadSession);
   const [tab, setTab] = useState<Tab>('offers');
-  const api = session ? new Api(session.apiUrl, session.key) : null;
+  const [opTab, setOpTab] = useState<'clients' | 'catalogue'>('clients');
 
   const signOut = () => {
     saveSession(null);
     setSession(null);
   };
 
-  if (!session || !api) return <SignIn onSignedIn={(s) => (saveSession(s), setSession(s))} />;
+  if (!session) return <SignIn onSignedIn={(s) => (saveSession(s), setSession(s))} />;
+  const operator = session.role === 'operator';
+  const tabs = operator
+    ? [
+        { id: 'clients', label: 'Clients' },
+        { id: 'catalogue', label: 'Catalogue' },
+      ]
+    : TABS;
+  const current = operator ? opTab : tab;
+  const api = new Api(session.apiUrl, session.key);
   return (
     <div className="shell">
       <header className="top">
@@ -65,8 +78,13 @@ export function App() {
           </div>
         </div>
         <nav className="tabs" aria-label="Sections">
-          {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? 'tab active' : 'tab'} onClick={() => setTab(t.id)} aria-current={tab === t.id ? 'page' : undefined}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              className={current === t.id ? 'tab active' : 'tab'}
+              onClick={() => (operator ? setOpTab(t.id as 'clients' | 'catalogue') : setTab(t.id as Tab))}
+              aria-current={current === t.id ? 'page' : undefined}
+            >
               {t.label}
             </button>
           ))}
@@ -76,31 +94,53 @@ export function App() {
         </button>
       </header>
       <main className="content">
-        {tab === 'offers' && <Offers api={api} />}
-        {tab === 'merchants' && <Merchants api={api} />}
-        {tab === 'malls' && <Malls api={api} />}
-        {tab === 'reports' && <Reports api={api} />}
-        {tab === 'settings' && <Settings api={api} />}
+        {operator && <Operator api={new PlatformApi(session.apiUrl, session.key)} tab={opTab} />}
+        {!operator && tab === 'offers' && <Offers api={api} />}
+        {!operator && tab === 'merchants' && <Merchants api={api} />}
+        {!operator && tab === 'malls' && <Malls api={api} />}
+        {!operator && tab === 'reports' && <Reports api={api} />}
+        {!operator && tab === 'settings' && <Settings api={api} />}
       </main>
     </div>
   );
 }
 
+const LAST_API = 'locus-console-api-url';
+function lastApiUrl(): string {
+  try {
+    return localStorage.getItem(LAST_API) ?? DEFAULT_API;
+  } catch {
+    return DEFAULT_API;
+  }
+}
+
 function SignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
-  const [apiUrl, setApiUrl] = useState(DEFAULT_API);
+  const [role, setRole] = useState<'bank' | 'operator'>('bank');
+  const [apiUrl, setApiUrl] = useState(lastApiUrl);
   const [key, setKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => setError(null), [apiUrl, key]);
+  useEffect(() => setError(null), [apiUrl, key, role]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!key.startsWith('lk_sec_')) return setError('Use your secret key (it starts with lk_sec_).');
+    if (role === 'bank' && !key.startsWith('lk_sec_')) return setError('Use your secret key (it starts with lk_sec_).');
     setBusy(true);
     try {
       const url = apiUrl.trim().replace(/\/$/, '');
-      const me = await new Api(url, key.trim()).me();
-      onSignedIn({ apiUrl: url, key: key.trim(), tenantName: me.tenant.name });
+      let tenantName: string;
+      if (role === 'bank') {
+        tenantName = (await new Api(url, key.trim()).me()).tenant.name;
+      } else {
+        await new PlatformApi(url, key.trim()).tenants();
+        tenantName = 'Locus operator';
+      }
+      try {
+        localStorage.setItem(LAST_API, url);
+      } catch {
+        // not remembered; fine
+      }
+      onSignedIn({ role, apiUrl: url, key: key.trim(), tenantName });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -112,14 +152,24 @@ function SignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
     <div className="signin">
       <form className="card narrow" onSubmit={submit}>
         <h1>Locus Console</h1>
-        <p className="muted">Manage your merchants and mall offers, and see how they perform.</p>
+        <div className="filters" role="group" aria-label="Who are you">
+          <button type="button" className={role === 'bank' ? 'chip active' : 'chip'} onClick={() => setRole('bank')}>
+            Bank staff
+          </button>
+          <button type="button" className={role === 'operator' ? 'chip active' : 'chip'} onClick={() => setRole('operator')}>
+            Locus operator
+          </button>
+        </div>
+        <p className="muted">
+          {role === 'bank' ? 'Manage your merchants and mall offers, and see how they perform.' : 'Create clients and their keys, and load the places catalogue.'}
+        </p>
         <label>
           API address
           <input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="https://locus-api.example.workers.dev" required inputMode="url" />
         </label>
         <label>
-          Secret key
-          <input value={key} onChange={(e) => setKey(e.target.value)} type="password" placeholder="lk_sec_…" required autoComplete="off" />
+          {role === 'bank' ? 'Secret key' : 'Platform key'}
+          <input value={key} onChange={(e) => setKey(e.target.value)} type="password" placeholder={role === 'bank' ? 'lk_sec_…' : 'LOCUS_PLATFORM_KEY'} required autoComplete="off" />
         </label>
         {error && <p className="error">{error}</p>}
         <button className="primary" disabled={busy}>

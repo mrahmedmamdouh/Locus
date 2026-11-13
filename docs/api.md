@@ -167,7 +167,48 @@ LOCUS_API_URL=http://localhost:8787 LOCUS_PLATFORM_KEY=… \
 
 Run the console against it with `npm run dev --workspace console` (http://localhost:5174). Sign in with the API address and the secret key.
 
-## Deploy to Cloudflare (free tier)
+## Deploy to Cloudflare from GitHub (free tier)
+
+GitHub deploys the API for you. You only give it access to your Cloudflare account, once.
+
+**1. Create a Cloudflare API token.** Sign in at dash.cloudflare.com (a free account is enough), then:
+
+1. Go to **My Profile → API Tokens → Create Token** and pick the template **Edit Cloudflare Workers**.
+2. Under **Permissions**, add **Account → D1 → Edit**.
+3. Under **Account Resources**, choose your account. **Continue → Create Token** and copy the token.
+4. Also copy your **Account ID**: Workers & Pages → Account details (or the right-hand column of the account home).
+
+**2. Add three repository secrets on GitHub.** Go to the repo → **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Name | Value |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | the token from step 1 |
+| `CLOUDFLARE_ACCOUNT_ID` | the account ID |
+| `LOCUS_PLATFORM_KEY` | a long random password you make up (24+ characters, from your password manager). It is the Locus operator key. |
+
+**3. Run the deploy.** Go to **Actions → Deploy API to Cloudflare → Run workflow**. In about 3 minutes it:
+
+- creates a workers.dev subdomain if the account has none (your GitHub name, else a variant);
+- creates the D1 database `locus`;
+- applies the migrations, which create the tables and the three pilot malls;
+- deploys the Worker;
+- stores the SHA-256 of `LOCUS_PLATFORM_KEY` as a Worker secret;
+- checks `/health` and the key.
+
+The run's **Summary** shows the API address, e.g. `https://locus-api.mrahmedmamdouh.workers.dev`. No key is ever printed, because the repository and its logs are public. After this, every change to `api/` deploys itself.
+
+**4. Finish in the console.** Open https://mrahmedmamdouh.github.io/Locus/console/, choose **Locus operator**, and sign in with the API address and `LOCUS_PLATFORM_KEY`:
+
+1. **Clients:** create *Demo Bank* and copy its publishable key (for the app) and secret key (for bank staff). They are shown once.
+2. **Catalogue:** upload `malls.csv` and `stores.csv` (29 malls, 1,210 stores).
+
+Optional repository variables (Settings → Secrets and variables → Actions → Variables):
+
+- `LOCUS_API_URL`: fills in the API address on the console sign-in page.
+- `LOCUS_DEMO_PUBLISHABLE_KEY`: builds the Android demo app with the key already in.
+
+## Deploy from your computer instead
+
 
 **One command, from your Mac** (Node 22+, the repo cloned). It needs your own Cloudflare login, which is why it runs on your computer:
 

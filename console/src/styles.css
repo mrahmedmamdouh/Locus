@@ -577,3 +577,16 @@ code {
 [dir='rtl'] {
   text-align: right;
 }
+
+.keys .key-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 3fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+}
+@media (max-width: 640px) {
+  .keys .key-row {
+    grid-template-columns: 1fr;
+  }
+}

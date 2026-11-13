@@ -32,10 +32,10 @@ export function createApp(deps: AppDeps) {
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Cache-Control', 'no-store');
   });
-  app.use(
-    '/v1/admin/*',
-    cors({ origin: (o) => (deps.consoleOrigins.includes(o) ? o : null), allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], maxAge: 600 }),
-  );
+  // The console (bank staff and Locus operators) calls the admin and platform routes from the browser.
+  const consoleCors = cors({ origin: (o) => (deps.consoleOrigins.includes(o) ? o : null), allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], maxAge: 600 });
+  app.use('/v1/admin/*', consoleCors);
+  app.use('/v1/platform/*', consoleCors);
 
   app.get('/', (c) => c.json({ name: 'Locus API', version: 'v1', docs: 'https://github.com/mrahmedmamdouh/Locus/blob/main/docs/api.md' }));
   app.get('/health', async (c) => {

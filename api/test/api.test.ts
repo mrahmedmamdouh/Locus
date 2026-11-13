@@ -77,6 +77,8 @@ describe('auth', () => {
     expect(ok.headers.get('Access-Control-Allow-Origin')).toBe('https://console.example');
     const no = await env.app.request('/v1/admin/me', { method: 'OPTIONS', headers: { Origin: 'https://evil.example', 'Access-Control-Request-Method': 'GET' } });
     expect(no.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    const op = await env.app.request('/v1/platform/tenants', { method: 'OPTIONS', headers: { Origin: 'https://console.example', 'Access-Control-Request-Method': 'POST' } });
+    expect(op.headers.get('Access-Control-Allow-Origin')).toBe('https://console.example');
   });
 });
 

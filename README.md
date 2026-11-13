@@ -36,7 +36,7 @@ Many budget Android phones have no barometer. The app's **device check** records
 The field tests passed (Mall of Oman, Oman Avenues, City Centre Seeb, November 2026), so the pilot product is built on the same floor logic:
 
 - **SDK** for the bank's iOS and Android apps: detects arrival at a pilot mall (also when the app is closed), takes the floor baseline at the doors, tracks the floor and asks the API which of the bank's offers to show (at most one per floor per visit). Integration guide: [docs/sdk.md](docs/sdk.md).
-- **API**: Locus owns the places layer (malls, floors, stores); each bank owns its merchants and offers. Endpoints and the one-command Cloudflare setup: [docs/api.md](docs/api.md).
+- **API**: Locus owns the places layer (malls, floors, stores); each bank owns its merchants and offers. Endpoints and deployment to Cloudflare from GitHub: [docs/api.md](docs/api.md#deploy-to-cloudflare-from-github-free-tier).
 - **Console** for bank staff to manage merchants and offers and read reports.
 
 ## Quick start
