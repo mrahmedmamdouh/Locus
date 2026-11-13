@@ -61,20 +61,31 @@ public final class LocusAPIClient {
         request("GET", "v1/sdk/malls", query: q, completion: completion)
     }
 
-    func offers(installId: String, mallId: String, floorIndex: Int?, completion: @escaping (Result<LocusOffersResponse, LocusError>) -> Void) {
+    struct OffersQuery {
+        let installId: String
+        let mallId: String
+        let floorIndex: Int?
+        let customerRef: String?
+        let segments: [String]
+        let locale: String
+    }
+
+    func offers(_ q: OffersQuery, completion: @escaping (Result<LocusOffersResponse, LocusError>) -> Void) {
         struct Body: Encodable {
-            let installId: String
-            let mallId: String
-            let floorIndex: Int?
+            let q: OffersQuery
             func encode(to encoder: Encoder) throws {
                 var c = encoder.container(keyedBy: CodingKeys.self)
-                try c.encode(installId, forKey: .installId)
-                try c.encode(mallId, forKey: .mallId)
-                try c.encode(floorIndex, forKey: .floorIndex) // explicit null = floor unknown
+                try c.encode(q.installId, forKey: .installId)
+                try c.encode(q.mallId, forKey: .mallId)
+                try c.encode(q.floorIndex, forKey: .floorIndex) // explicit null = floor unknown
+                try c.encodeIfPresent(q.customerRef, forKey: .customerRef)
+                try c.encode(q.segments, forKey: .segments)
+                try c.encode(q.locale, forKey: .locale)
+                try c.encode("ios", forKey: .platform)
             }
-            enum CodingKeys: String, CodingKey { case installId, mallId, floorIndex }
+            enum CodingKeys: String, CodingKey { case installId, mallId, floorIndex, customerRef, segments, locale, platform }
         }
-        let body = try? JSONEncoder().encode(Body(installId: installId, mallId: mallId, floorIndex: floorIndex))
+        let body = try? JSONEncoder().encode(Body(q: q))
         request("POST", "v1/sdk/offers", body: body, completion: completion)
     }
 

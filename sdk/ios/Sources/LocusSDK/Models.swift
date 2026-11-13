@@ -87,7 +87,12 @@ public struct LocusOffersResponse: Codable, Equatable, Sendable {
     public let offers: [LocusOffer]
     /// The one offer to show now, or nil (none, already notified on this floor, or daily caps reached).
     public let push: LocusOffer?
+    /// "sdk": your app shows `push`; "webhook": Locus sent it to your bank's server, which pushes it; nil when no push.
+    public let delivery: String?
+    /// Why there is no push: "no-offers", "floor-already-notified", "quiet-hours", "daily-limit", "daily-cap-reached", "holdout".
     public let reason: String
+    /// Language of titles and texts ("en" or "ar").
+    public let language: String?
 }
 
 struct MallsResponse: Codable {

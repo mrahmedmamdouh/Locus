@@ -75,12 +75,18 @@ class ApiClientTest {
 
     @Test
     fun offersSendsExplicitNullFloorAndParsesPush() {
-        reply = 200 to """{"mallId":"mall-of-oman","floorIndex":null,"offers":[],"push":{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"},"reason":"ok"}"""
-        val r = await<LocusOffersResponse> { client().offers("install-0001", "mall-of-oman", null, it) }
+        reply = 200 to """{"mallId":"mall-of-oman","floorIndex":null,"offers":[],"push":{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"},"delivery":"webhook","reason":"ok","language":"ar"}"""
+        val q = ApiClient.OffersQuery("install-0001", "mall-of-oman", null, "cust-7f3a", listOf("visa-infinite"), "ar")
+        val r = await<LocusOffersResponse> { client().offers(q, it) }
         assertEquals("o1", r.getOrThrow().push?.id)
+        assertEquals("webhook", r.getOrThrow().delivery)
         val body = JSONObject(seen.single().third)
         assertTrue(body.isNull("floorIndex"))
         assertEquals("install-0001", body.getString("installId"))
+        assertEquals("cust-7f3a", body.getString("customerRef"))
+        assertEquals("visa-infinite", body.getJSONArray("segments").getString(0))
+        assertEquals("ar", body.getString("locale"))
+        assertEquals("android", body.getString("platform"))
     }
 
     @Test

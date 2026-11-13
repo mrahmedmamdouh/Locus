@@ -72,8 +72,24 @@ class ApiClient(
         }, done)
     }
 
-    fun offers(installId: String, mallId: String, floorIndex: Int?, done: (Result<LocusOffersResponse>) -> Unit) {
-        val body = JSONObject().put("installId", installId).put("mallId", mallId).put("floorIndex", floorIndex ?: JSONObject.NULL)
+    data class OffersQuery(
+        val installId: String,
+        val mallId: String,
+        val floorIndex: Int?,
+        val customerRef: String? = null,
+        val segments: List<String> = emptyList(),
+        val locale: String = "en",
+    )
+
+    fun offers(q: OffersQuery, done: (Result<LocusOffersResponse>) -> Unit) {
+        val body = JSONObject()
+            .put("installId", q.installId)
+            .put("mallId", q.mallId)
+            .put("floorIndex", q.floorIndex ?: JSONObject.NULL)
+            .put("segments", JSONArray(q.segments))
+            .put("locale", q.locale)
+            .put("platform", "android")
+        q.customerRef?.let { body.put("customerRef", it) }
         request("POST", "v1/sdk/offers", body, { LocusOffersResponse.fromJson(JSONObject(it)) }, done)
     }
 

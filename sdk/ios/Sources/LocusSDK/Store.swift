@@ -50,12 +50,23 @@ final class LocusStore {
         set { save(newValue, "snapshot") }
     }
 
+    /// The bank's pseudonymous customer reference (set by the app).
+    var customerRef: String? {
+        get { defaults.string(forKey: "customerRef") }
+        set { defaults.set(newValue, forKey: "customerRef") }
+    }
+
+    var segments: [String] {
+        get { defaults.stringArray(forKey: "segments") ?? [] }
+        set { defaults.set(newValue, forKey: "segments") }
+    }
+
     var queue: [LocusEvent] {
         get { load("queue") ?? [] }
         set { save(Array(newValue.suffix(LocusStore.maxQueuedEvents)), "queue") }
     }
 
     func clearAll() {
-        for k in ["installId", "malls", "mallsFetchedAt", "snapshot", "queue"] { defaults.removeObject(forKey: k) }
+        for k in ["installId", "malls", "mallsFetchedAt", "snapshot", "queue", "customerRef", "segments"] { defaults.removeObject(forKey: k) }
     }
 }

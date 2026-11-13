@@ -129,7 +129,26 @@ public final class Locus: NSObject {
             completion(.failure(.notConfigured))
             return
         }
-        api.offers(installId: store.installId, mallId: place.mall.id, floorIndex: place.floor?.index, completion: completion)
+        api.offers(query(place), completion: completion)
+    }
+
+    /// The bank's own pseudonymous reference for the signed-in customer (never a national ID, card or
+    /// account number). Needed for webhook delivery and for matching card purchases. Nil when signed out.
+    public func setCustomerRef(_ ref: String?) { store.customerRef = ref }
+
+    /// Segment tags for offer eligibility, e.g. ["visa-infinite", "salary"] (lowercase letters, digits, dashes).
+    public func setSegments(_ segments: [String]) { store.segments = segments }
+
+    /// Offer language: "ar" or "en". Nil (default) follows the phone's preferred language.
+    public var language: String?
+
+    private var resolvedLanguage: String {
+        if let l = language { return l == "ar" ? "ar" : "en" }
+        return (Locale.preferredLanguages.first ?? "en").hasPrefix("ar") ? "ar" : "en"
+    }
+
+    private func query(_ place: LocusPlace) -> LocusAPIClient.OffersQuery {
+        LocusAPIClient.OffersQuery(installId: store.installId, mallId: place.mall.id, floorIndex: place.floor?.index, customerRef: store.customerRef, segments: store.segments, locale: resolvedLanguage)
     }
 
     public func recordOfferOpened(_ offer: LocusOffer) { recordOffer("offer_opened", offer) }
@@ -249,12 +268,14 @@ public final class Locus: NSObject {
 
     private func fetchOffers() {
         guard let api = api, let place = currentPlace else { return }
-        api.offers(installId: store.installId, mallId: place.mall.id, floorIndex: place.floor?.index) { [weak self] result in
+        api.offers(query(place)) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case let .success(r):
                 // Still in the same place?
                 guard let now = self.currentPlace, now.mall.id == r.mallId, now.floor?.index == r.floorIndex, let offer = r.push else { return }
+                // Webhook delivery: the bank's server pushes it and Locus already counted it as delivered.
+                guard r.delivery != "webhook" else { return }
                 let show = self.delegate?.locus(self, shouldPresent: offer, at: now) ?? self.options?.postLocalNotifications ?? false
                 guard show else { return }
                 self.enqueue(LocusEvent(type: "offer_delivered", mallId: now.mall.id, floorIndex: now.floor?.index, offerId: offer.id))

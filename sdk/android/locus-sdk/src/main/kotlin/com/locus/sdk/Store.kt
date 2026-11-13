@@ -30,6 +30,15 @@ internal class Store(context: Context) {
         get() = prefs.getString("options", null)?.let { runCatching { LocusOptions.fromJson(JSONObject(it)) }.getOrNull() }
         set(v) = prefs.edit().putString("options", v?.toJson()?.toString()).apply()
 
+    /** The bank's pseudonymous customer reference (set by the app). */
+    var customerRef: String?
+        get() = prefs.getString("customerRef", null)
+        set(v) = prefs.edit().putString("customerRef", v).apply()
+
+    var segments: List<String>
+        get() = prefs.getString("segments", null)?.let { s -> runCatching { JSONArray(s).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrNull() } ?: emptyList()
+        set(v) = prefs.edit().putString("segments", JSONArray(v).toString()).apply()
+
     var running: Boolean
         get() = prefs.getBoolean("running", false)
         set(v) = prefs.edit().putBoolean("running", v).apply()

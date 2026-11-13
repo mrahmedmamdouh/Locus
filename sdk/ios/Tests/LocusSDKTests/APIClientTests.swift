@@ -62,18 +62,24 @@ final class APIClientTests: XCTestCase {
 
     func testOffersSendsExplicitNullFloorAndDecodesPush() {
         StubProtocol.handler = { _ in
-            let json = #"{"mallId":"mall-of-oman","floorIndex":null,"offers":[{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"}],"push":{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"},"reason":"ok"}"#
+            let json = #"{"mallId":"mall-of-oman","floorIndex":null,"offers":[{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"}],"push":{"id":"o1","merchant":{"id":"m1","name":"Costa"},"floorIndex":null,"floorLabel":null,"storeName":null,"title":"20% off","body":"","ctaUrl":null,"endsAt":"2026-12-31T00:00:00.000Z"},"delivery":"sdk","reason":"ok","language":"ar"}"#
             return (200, Data(json.utf8))
         }
         let done = expectation(description: "offers")
-        client().offers(installId: "install-0001", mallId: "mall-of-oman", floorIndex: nil) { result in
+        let q = LocusAPIClient.OffersQuery(installId: "install-0001", mallId: "mall-of-oman", floorIndex: nil, customerRef: "cust-7f3a", segments: ["visa-infinite"], locale: "ar")
+        client().offers(q) { result in
             XCTAssertEqual(try? result.get().push?.id, "o1")
+            XCTAssertEqual(try? result.get().delivery, "sdk")
             done.fulfill()
         }
         wait(for: [done], timeout: 5)
         let body = try! JSONSerialization.jsonObject(with: StubProtocol.lastBody!) as! [String: Any]
         XCTAssertTrue(body["floorIndex"] is NSNull)
         XCTAssertEqual(body["installId"] as? String, "install-0001")
+        XCTAssertEqual(body["customerRef"] as? String, "cust-7f3a")
+        XCTAssertEqual(body["segments"] as? [String], ["visa-infinite"])
+        XCTAssertEqual(body["locale"] as? String, "ar")
+        XCTAssertEqual(body["platform"] as? String, "ios")
     }
 
     func testErrorsCarryTheApiMessage() {
@@ -89,6 +95,16 @@ final class APIClientTests: XCTestCase {
             done.fulfill()
         }
         wait(for: [done], timeout: 5)
+    }
+
+    func testPrivacyManifestShipsWithTheSDK() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/LocusSDK/PrivacyInfo.xcprivacy")
+        let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as! [String: Any]
+        XCTAssertEqual(plist["NSPrivacyTracking"] as? Bool, false)
+        let types = (plist["NSPrivacyCollectedDataTypes"] as! [[String: Any]]).map { $0["NSPrivacyCollectedDataType"] as! String }
+        XCTAssertTrue(types.contains("NSPrivacyCollectedDataTypeCoarseLocation"))
+        XCTAssertFalse(types.contains("NSPrivacyCollectedDataTypePreciseLocation"))
     }
 
     func testEventsNeverContainCoordinates() throws {

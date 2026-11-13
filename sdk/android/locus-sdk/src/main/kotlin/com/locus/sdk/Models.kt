@@ -88,7 +88,20 @@ data class LocusOffer(
     }
 }
 
-data class LocusOffersResponse(val mallId: String, val floorIndex: Int?, val offers: List<LocusOffer>, val push: LocusOffer?, val reason: String) {
+/**
+ * [delivery]: "sdk" = your app shows [push]; "webhook" = Locus sent it to your bank's server, which
+ * pushes it; null when there is no push. [reason] says why there is none ("no-offers",
+ * "floor-already-notified", "quiet-hours", "daily-limit", "daily-cap-reached", "holdout").
+ */
+data class LocusOffersResponse(
+    val mallId: String,
+    val floorIndex: Int?,
+    val offers: List<LocusOffer>,
+    val push: LocusOffer?,
+    val delivery: String?,
+    val reason: String,
+    val language: String?,
+) {
     companion object {
         internal fun fromJson(o: JSONObject): LocusOffersResponse {
             val list = o.getJSONArray("offers")
@@ -96,8 +109,10 @@ data class LocusOffersResponse(val mallId: String, val floorIndex: Int?, val off
                 mallId = o.getString("mallId"),
                 floorIndex = o.optIntOrNull("floorIndex"),
                 offers = (0 until list.length()).map { LocusOffer.fromJson(list.getJSONObject(it)) },
-                push = if (o.isNull("push")) null else LocusOffer.fromJson(o.getJSONObject("push")),
+                push = if (!o.has("push") || o.isNull("push")) null else LocusOffer.fromJson(o.getJSONObject("push")),
+                delivery = o.optStringOrNull("delivery"),
                 reason = o.optString("reason"),
+                language = o.optStringOrNull("language"),
             )
         }
     }

@@ -153,8 +153,32 @@ object Locus {
         val p = currentPlace
         val s = store
         if (a == null || p == null || s == null) return done(Result.failure(LocusError.NotConfigured))
-        a.offers(s.installId, p.mall.id, p.floor?.index, done)
+        a.offers(query(s, p), done)
     }
+
+    /**
+     * The bank's own pseudonymous reference for the signed-in customer (never a national ID, card or
+     * account number). Needed for webhook delivery and for matching card purchases. Null when signed out.
+     */
+    fun setCustomerRef(ref: String?) {
+        store?.customerRef = ref
+    }
+
+    /** Segment tags for offer eligibility, e.g. listOf("visa-infinite", "salary"). */
+    fun setSegments(segments: List<String>) {
+        store?.segments = segments
+    }
+
+    /** Offer language: "ar" or "en". Null (default) follows the phone's language. */
+    var language: String? = null
+
+    private fun resolvedLanguage(): String {
+        language?.let { return if (it == "ar") "ar" else "en" }
+        return if (java.util.Locale.getDefault().language == "ar") "ar" else "en"
+    }
+
+    private fun query(s: Store, p: LocusPlace) =
+        ApiClient.OffersQuery(s.installId, p.mall.id, p.floor?.index, s.customerRef, s.segments, resolvedLanguage())
 
     fun recordOfferOpened(offer: LocusOffer) = recordOffer("offer_opened", offer)
     fun recordOfferDismissed(offer: LocusOffer) = recordOffer("offer_dismissed", offer)
@@ -397,11 +421,13 @@ object Locus {
         val a = api ?: return
         val s = store ?: return
         val place = currentPlace ?: return
-        a.offers(s.installId, place.mall.id, place.floor?.index) { r ->
+        a.offers(query(s, place)) { r ->
             r.onSuccess { resp ->
                 val now = currentPlace ?: return@onSuccess
                 val offer = resp.push ?: return@onSuccess
                 if (now.mall.id != resp.mallId || now.floor?.index != resp.floorIndex) return@onSuccess
+                // Webhook delivery: the bank's server pushes it and Locus already counted it as delivered.
+                if (resp.delivery == "webhook") return@onSuccess
                 val show = listener?.shouldPresent(offer, now) ?: (options?.postLocalNotifications == true)
                 if (!show) return@onSuccess
                 enqueue(LocusEvent("offer_delivered", now.mall.id, now.floor?.index, offer.id))
