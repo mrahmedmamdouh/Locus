@@ -38,6 +38,7 @@ const offerBody = (merchantId: string, extra: Record<string, unknown> = {}) => (
   startsAt: '2026-11-30T00:00:00+04:00',
   endsAt: '2026-12-31T00:00:00+04:00',
   status: 'active',
+  holdoutPct: 0,
   ...extra,
 });
 

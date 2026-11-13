@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './app';
 import { sha256Hex } from './auth';
 import { openNodeDb } from './db-node';
+import { retryDueDeliveries } from './webhook';
 
 /**
  * Local server: `npm run dev --workspace api`. Uses a SQLite file (LOCUS_DB, default ./locus-dev.sqlite).
@@ -18,4 +19,6 @@ const app = createApp({
 });
 const port = Number(process.env.PORT ?? 8787);
 serve({ fetch: app.fetch, port });
+// Retry bank webhooks that failed, like the Workers cron.
+setInterval(() => void retryDueDeliveries(db, (url, init) => fetch(url, init), new Date()).catch((e) => console.error(e)), 60_000);
 console.log(`Locus API on http://localhost:${port}${platformKey ? '' : ' (platform routes off: set LOCUS_PLATFORM_KEY)'}`);

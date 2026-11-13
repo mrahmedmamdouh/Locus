@@ -3,6 +3,10 @@ name = "locus-api"
 main = "src/worker.ts"
 compatibility_date = "2026-11-01"
 
+# Retry failed bank webhooks every minute.
+[triggers]
+crons = ["* * * * *"]
+
 [vars]
 # Browser origins allowed to call /v1/admin (the bank console on GitHub Pages).
 CONSOLE_ORIGINS = "https://mrahmedmamdouh.github.io"
