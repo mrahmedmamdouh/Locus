@@ -22,8 +22,21 @@ Many budget Android phones have no barometer. The app's **device check** records
 | [`packages/altitude-core`](packages/altitude-core) | Shared TypeScript library: pressure to altitude, floor bands, 3D geofences, CSV schema, accuracy stats and the go/no-go gate. |
 | [`app/`](app) | Expo (SDK 58) field-test app. Testers pick a venue, calibrate at the entrance, record readings on a known floor and export CSV. |
 | [`dashboard/`](dashboard) | Vite + React static site. Load exported CSVs and see accuracy per source, device and venue, plus the gate verdict. |
+| [`Package.swift`](Package.swift), [`sdk/ios`](sdk/ios) | **iOS SDK** (Swift package `LocusSDK`): mall arrival, floor, offers. |
+| [`sdk/android`](sdk/android) | **Android SDK** (`locus-sdk` AAR + `locus-core`). |
+| [`sdk/spec/vectors`](sdk/spec/vectors) | Shared test vectors: the TypeScript reference engine, Swift and Kotlin must give identical outputs. |
+| [`api/`](api) | **Pilot API** (Cloudflare Workers + D1, or Node): malls catalogue, client merchants and offers, ranking, events, reports. |
+| [`console/`](console) | **Bank console** (served at [/console/](https://mrahmedmamdouh.github.io/Locus/console/)): merchants, offers, malls, reports. |
 | [`docs/`](docs) | [Field-test protocol](docs/field-test-protocol.md), [architecture](docs/architecture.md) and [decision records](docs/adr). |
 | [`.github/`](.github) | CI, Pages deployment, optional EAS Update workflow, Dependabot. |
+
+## Pilot stack (SDK, API, console)
+
+The field tests passed (Mall of Oman, Oman Avenues, City Centre Seeb, November 2026), so the pilot product is built on the same floor logic:
+
+- **SDK** for the bank's iOS and Android apps: detects arrival at a pilot mall (also when the app is closed), takes the floor baseline at the doors, tracks the floor and asks the API which of the bank's offers to show (at most one per floor per visit). Integration guide: [docs/sdk.md](docs/sdk.md).
+- **API**: Locus owns the places layer (malls, floors, stores); each bank owns its merchants and offers. Endpoints and Cloudflare deployment: [docs/api.md](docs/api.md).
+- **Console** for bank staff to manage merchants and offers and read reports.
 
 ## Quick start
 

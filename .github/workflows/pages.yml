@@ -1,4 +1,4 @@
-name: Deploy dashboard to Pages
+name: Deploy dashboard and console to Pages
 
 # One-time setup: repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 on:
@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'dashboard/**'
+      - 'console/**'
       - 'packages/**'
       - 'package-lock.json'
       - '.github/workflows/pages.yml'
@@ -43,6 +44,15 @@ jobs:
 
       - name: Build
         run: npm run build -w dashboard
+
+      # The bank console is served next to the dashboard at /console/. Set the repository
+      # variable LOCUS_API_URL to prefill the API address on its sign-in page.
+      - name: Build console
+        env:
+          VITE_LOCUS_API_URL: ${{ vars.LOCUS_API_URL }}
+        run: |
+          npm run build -w console
+          cp -r console/dist dashboard/dist/console
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

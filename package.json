@@ -7,7 +7,8 @@
     "packages/*",
     "app",
     "dashboard",
-    "api"
+    "api",
+    "console"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",

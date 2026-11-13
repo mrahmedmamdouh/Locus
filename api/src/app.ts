@@ -294,7 +294,9 @@ export function createApp(deps: AppDeps) {
   });
 
   admin.get('/malls', async (c) => {
-    const malls = await db.all<MallRow & { store_count: number }>('SELECT m.*, (SELECT COUNT(*) FROM stores s WHERE s.mall_id = m.id) AS store_count FROM malls m ORDER BY m.status, m.name');
+    const malls = await db.all<MallRow & { store_count: number }>(
+      "SELECT m.*, (SELECT COUNT(*) FROM stores s WHERE s.mall_id = m.id) AS store_count FROM malls m ORDER BY CASE m.status WHEN 'pilot' THEN 0 ELSE 1 END, m.name",
+    );
     const floors = await floorsByMall(malls.map((m) => m.id));
     return c.json({ malls: malls.map((m) => ({ ...mallJson(m, floors.get(m.id) ?? []), storeCount: Number(m.store_count) })) });
   });
