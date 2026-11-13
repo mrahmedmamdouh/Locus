@@ -27,6 +27,7 @@ import type { Floor, VenueBoundary } from './types';
  * 5. A baseline must start within maxPendingMs of the arrival. Later than that the phone may be
  *    upstairs, so the visit stays mall-level (no floors) rather than risk a wrong baseline.
  * 6. Floor changes are reported after the floor has been stable for floorDwellMs.
+ * 7. A phone found already inside when monitoring starts (not a crossing) is mall-level only.
  */
 
 export interface EngineVenue {
@@ -68,7 +69,12 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
 };
 
 export type EngineInput =
-  | { type: 'enter'; tMs: number; venueId: string; accuracyM: number | null }
+  /**
+   * crossing: true (default) when the OS reported a boundary crossing; false when the phone was
+   * found already inside, e.g. monitoring just started in the middle of the mall. A found-inside
+   * visit is mall-level only: the phone may be upstairs, so no baseline is taken.
+   */
+  | { type: 'enter'; tMs: number; venueId: string; accuracyM: number | null; crossing?: boolean }
   | { type: 'exit'; tMs: number; venueId: string }
   | { type: 'pressure'; tMs: number; hPa: number }
   /** The app was killed and relaunched: the engine is rebuilt from its own snapshot(). */
@@ -236,9 +242,10 @@ export class VisitEngine {
     if (v && v.venue.id !== venue.id && v.exitedAtMs === null) {
       out.push({ type: 'left', tMs: e.tMs, venueId: v.venue.id });
     }
+    const crossing = e.crossing !== false;
     this.visit = {
       venue,
-      phase: 'capturing',
+      phase: crossing ? 'capturing' : 'no-baseline',
       enteredAtMs: e.tMs,
       exitedAtMs: null,
       captureStartMs: null,
@@ -252,6 +259,7 @@ export class VisitEngine {
       previous,
     };
     out.push({ type: 'arrived', tMs: e.tMs, venueId: venue.id, resumed: false });
+    if (!crossing) out.push({ type: 'baseline', tMs: e.tMs, venueId: venue.id, status: 'unavailable', baselinePressureHpa: null, sampleCount: 0 });
   }
 
   private onExit(e: Extract<EngineInput, { type: 'exit' }>, out: EngineOutput[]): void {

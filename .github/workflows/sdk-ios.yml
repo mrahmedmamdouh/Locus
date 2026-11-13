@@ -1,0 +1,35 @@
+name: iOS SDK
+
+on:
+  push:
+    branches: [main]
+    paths: ['Package.swift', 'sdk/ios/**', 'sdk/spec/**', '.github/workflows/sdk-ios.yml']
+  pull_request:
+    paths: ['Package.swift', 'sdk/ios/**', 'sdk/spec/**', '.github/workflows/sdk-ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Swift tests (shared vectors) and iOS build
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: swift --version && xcodebuild -version
+
+      - name: Unit tests (macOS host)
+        run: swift test
+
+      - name: Build the SDK for iOS (simulator)
+        run: xcodebuild build -scheme LocusSDK -destination 'generic/platform=iOS Simulator' -quiet

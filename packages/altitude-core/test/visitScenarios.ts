@@ -77,6 +77,18 @@ function synthetic(): VisitScenario[] {
       inputs: [enter(T0, 'nowhere'), ...stand(T0 + 500, 0, 5)],
     },
     {
+      name: 'found-inside-is-mall-level',
+      description: 'Monitoring starts while the phone is already inside (not a crossing): mall-level only, and a later real crossing after an exit takes a baseline.',
+      venues: [mall],
+      inputs: [
+        { type: 'enter', tMs: T0, venueId: mall.id, accuracyM: 20, crossing: false },
+        ...stand(T0 + 500, 11.5, 10),
+        exit(T0 + 30 * MIN),
+        enter(T0 + 3 * 60 * MIN),
+        ...stand(T0 + 3 * 60 * MIN + 500, 0, 5),
+      ],
+    },
+    {
       name: 'quick-reentry-resumes',
       description: 'False exit 2 minutes after arrival and enter 6 minutes later (home, 12 Nov): the visit resumes, no new baseline, even upstairs.',
       venues: [mall],

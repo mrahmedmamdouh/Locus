@@ -48,6 +48,10 @@ describe('visit engine', () => {
     expect(kinds(run('late-reentry-takes-new-baseline'))).toEqual(['arrived', 'baseline:new', 'floor:0', 'left', 'arrived', 'baseline:new', 'floor:0']);
   });
 
+  it('keeps a phone found already inside at mall level', () => {
+    expect(kinds(run('found-inside-is-mall-level'))).toEqual(['arrived', 'baseline:unavailable', 'left', 'arrived', 'baseline:new', 'floor:0']);
+  });
+
   it('stays mall-level when no barometer sample arrives in time', () => {
     expect(kinds(run('no-barometer-stays-mall-level'))).toEqual(['arrived', 'baseline:unavailable', 'left']);
   });
