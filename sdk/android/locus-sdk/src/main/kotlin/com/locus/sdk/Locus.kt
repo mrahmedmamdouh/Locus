@@ -153,7 +153,7 @@ object Locus {
         val p = currentPlace
         val s = store
         if (a == null || p == null || s == null) return done(Result.failure(LocusError.NotConfigured))
-        a.offers(query(s, p), done)
+        a.offers(query(s, p).copy(listOnly = true), done)
     }
 
     /**

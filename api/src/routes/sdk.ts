@@ -23,7 +23,7 @@ import { inQuietHours, localClock } from '../time';
 import { ApiError, bad, ID_PATTERN, INSTALL_ID_PATTERN, isoTime, num, obj, oneOf, optInt, optStr, str } from '../validate';
 import { attemptDelivery, WEBHOOK_TTL_MS, type OfferReadyPayload } from '../webhook';
 
-export type PushReason = 'ok' | 'no-offers' | 'floor-already-notified' | 'quiet-hours' | 'daily-limit' | 'daily-cap-reached' | 'holdout';
+export type PushReason = 'list' | 'ok' | 'no-offers' | 'floor-already-notified' | 'quiet-hours' | 'daily-limit' | 'daily-cap-reached' | 'holdout';
 
 /** The SDK routes (publishable key, called from the bank's app). */
 export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<void>) => Promise<void>) {
@@ -145,6 +145,11 @@ export function sdkRoutes(svc: Services, auth: (c: never, next: () => Promise<vo
 
     let push = ranked.push;
     let reason: PushReason = ranked.reason;
+    // An in-app "offers here" list: no push decision, so no control-group or delivery records.
+    if (b.mode === 'list') {
+      push = null;
+      reason = 'list';
+    }
     if (push && inQuietHours(clock.minutes, tenant.quiet_start, tenant.quiet_end)) {
       push = null;
       reason = 'quiet-hours';

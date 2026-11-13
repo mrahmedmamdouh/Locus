@@ -17,47 +17,117 @@ Send keys as `Authorization: Bearer <key>`. Keys are stored only as SHA-256 hash
 | Method and path | Body / query | Returns |
 | --- | --- | --- |
 | `GET /v1/sdk/malls` | `lat`, `lon` (rough), `limit` (≤ 100) | Pilot malls nearest first, each with `boundary {lat, lon, radiusM}`, `entranceFloorIndex` and `floors [{index, label, zMinM, zMaxM}]` |
-| `POST /v1/sdk/offers` | `installId`, `mallId`, `floorIndex` (null = unknown) | `offers` (ranked) and `push` (the one to show now, or null) with `reason`: `ok`, `no-offers`, `floor-already-notified`, `daily-cap-reached` |
+| `POST /v1/sdk/offers` | `installId`, `mallId`, `floorIndex` (null = unknown), and optionally `customerRef`, `segments` (tags), `locale` (`en`/`ar`), `platform`, `mode: "list"` (in-app list: no push decision) | `offers` (ranked), `push` (the one to show now, or null), `delivery` (`sdk`: the app shows it; `webhook`: sent to the bank's server) and `reason` |
 | `POST /v1/sdk/events` | `installId`, `platform`, `events: [{type, mallId, floorIndex?, offerId?, t}]` (1–50) | `{accepted}`. Types: `arrived`, `floor`, `left`, `offer_delivered`, `offer_opened`, `offer_dismissed`. Extra fields such as coordinates are dropped. |
 
-**Ranking rules** ([`ranking.ts`](../api/src/ranking.ts)):
+**Which offers and which push** ([`routes/sdk.ts`](../api/src/routes/sdk.ts), [`ranking.ts`](../api/src/ranking.ts)). The checks run in this order; the first that stops a push becomes the `reason`:
 
-- Only the client's own active offers for that mall that are live now are considered.
-- Offers for a floor match only that floor. Whole-mall offers match everywhere, including phones that cannot tell their floor.
-- Score is `priority × 10`, plus 5 for a floor match.
-- At most one push per floor: none if this install got a push on the same mall and floor in the last 2 hours.
-- Offers over their daily cap for this install are not pushed. Caps reset at midnight Muscat time.
+1. **Eligible offers.** Only the client's own active offers that are live now count:
+    - offers for this mall;
+    - "all branches" offers of merchants with a branch here, placed on that branch's floor;
+    - offers with segments, only when the customer has one of those segments;
+    - offers under their budgets (shown count, matched purchases).
 
-## Admin routes (bank console)
+    Floor offers match that floor only. Whole-mall offers match everywhere, including phones that cannot tell their floor. None left: `no-offers`.
+2. **Ranking.** Score is `priority × 10`, plus 5 for a floor match.
+3. **One push per floor.** None if this install got a push, or was held out, on the same mall and floor in the last 2 hours: `floor-already-notified`.
+4. **Quiet hours** in the client's time zone: `quiet-hours`.
+5. **Daily limit across all offers** per customer (default 3): `daily-limit`.
+6. **Per-offer daily cap** per customer: `daily-cap-reached`.
+7. **Control group.** A stable `holdoutPct` share of customers (default 10%) never gets this offer pushed. Locus records an `offer_held_out` event for them instead: `holdout`.
 
-- `GET /v1/admin/me`
-- `GET /v1/admin/malls` (all malls with floors and store counts)
-- `GET /v1/admin/malls/{id}/stores?q=`
-- `GET|POST /v1/admin/merchants`
-- `PATCH|DELETE /v1/admin/merchants/{id}` (deleting fails while it has active offers)
-- `GET|POST /v1/admin/offers`, `GET|PATCH|DELETE /v1/admin/offers/{id}`
+All "per day" counts reset at local midnight in the client's time zone (`Asia/Muscat`, `Africa/Cairo`).
 
-  Offer fields:
+Responses come in Arabic when `locale` is `ar` and the offer has Arabic text. Otherwise they are in English.
+
+## Delivering through the bank's push service (webhook)
+
+With `deliveryMode: "webhook"`, Locus does not ask the SDK to show the push. It calls the bank's server, which pushes through Firebase, Braze, MoEngage or its own service. The bank links `customerRef`, its own pseudonymous customer reference that the app passes to the SDK, to the customer's devices.
+
+```
+POST <webhookUrl>
+Content-Type: application/json
+Locus-Event: offer.ready
+Locus-Delivery: 7b0c…            (same on retries: de-duplicate on it)
+Locus-Signature: t=1795000000,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>
+
+{"type":"offer.ready","deliveryId":"7b0c…","tenantId":"demo-bank","installId":"…","customerRef":"cust-7f3a",
+ "createdAt":"…","expiresAt":"… (+10 min)","mall":{"id":"mall-of-oman","name":"Mall of Oman"},
+ "floor":{"index":1,"label":"Level 2"},
+ "offer":{"id":"…","merchant":{"id":"…","name":"Costa Coffee","nameAr":"كوستا"},"title":"…","body":"…",
+          "titleAr":"…","bodyAr":"…","ctaUrl":null,"storeName":"Costa Coffee","endsAt":"…"}}
+```
+
+- **Verify every call.** Recompute the HMAC over `t` + `.` + the raw body with your signing secret and compare. Reject calls whose `t` is more than 5 minutes old.
+- **Answer any 2xx** to accept the call.
+- **Retries.** Other answers are retried after 30 s, 1, 2 and 4 minutes. Calls not delivered by `expiresAt` (10 minutes) are dropped, since the shopper has moved on.
+- **Delivered count.** The offer counts as delivered when Locus hands it to you.
+- **Testing.** "Send a test" in the console sends a signed `ping`.
+
+## Admin routes (bank console or the bank's servers)
+
+**Settings**
+
+- `GET|PATCH /v1/admin/settings` covers:
+    - `timezone`
+    - `deliveryMode` (`sdk` | `webhook`)
+    - `webhookUrl` (public https only)
+    - `quietHours {start, end}` (`HH:MM`, may wrap past midnight) or `null`
+    - `maxPushesPerDay` (1–20)
+- `POST /v1/admin/settings/webhook-secret` returns a new signing secret **once**.
+- `POST /v1/admin/settings/webhook-test` sends a signed `ping`.
+- `GET /v1/admin/deliveries?status=` lists the last 100 webhook deliveries.
+
+**Catalogue and merchants**
+
+- `GET /v1/admin/malls` (all malls with floors and store counts) and `GET /v1/admin/malls/{id}/stores?q=`.
+- `GET|POST /v1/admin/merchants`, `GET|PATCH|DELETE /v1/admin/merchants/{id}`.
+    - Merchant fields: `name`, `nameAr`, `category`, `mcc` (4 digits), `externalId` (your id, for re-imports), `mids` (card-acceptor IDs as on your transactions).
+    - A MID belongs to one merchant only.
+    - Deleting a merchant fails while it has active offers.
+- `PUT /v1/admin/merchants/{id}/branches {storeIds}` sets the merchant's branches (catalogue stores). `GET /v1/admin/merchants/{id}/suggestions` lists stores with similar names.
+- `POST /v1/admin/merchants/import {merchants, dryRun}` takes up to 500 merchants per call. Each item has the merchant fields above, plus:
+    - `branches: [{storeId} | {mallId, storeName?}]`;
+    - `autoMatch` (default true; with no branches given, Locus searches every mall by name).
+
+    It creates or updates by `externalId`, else by exact name. Name matches scoring ≥ 0.9 are linked; 0.6–0.9 come back for review. `dryRun: true` writes nothing.
+
+**Offers**
+
+- `GET|POST /v1/admin/offers`, `GET|PATCH|DELETE /v1/admin/offers/{id}`.
 
   | Field | Rule |
   | --- | --- |
   | `merchantId` | One of your merchants |
-  | `mallId` | A catalogue mall |
+  | `allBranches` | `true`: every branch of the merchant, each on its floor (`mallId`, `floorIndex`, `storeId` not used); needs at least one branch |
+  | `mallId` | A catalogue mall (when not `allBranches`) |
   | `floorIndex` | `null` = whole mall; otherwise a floor of that mall |
   | `storeId` | Optional catalogue store; sets the floor |
-  | `title` | Up to 80 characters |
-  | `body` | Up to 280 characters |
+  | `title`, `titleAr` | Up to 80 characters (Arabic optional) |
+  | `body`, `bodyAr` | Up to 280 characters (Arabic optional) |
   | `ctaUrl` | `https` only |
   | `startsAt`, `endsAt` | ISO with a time zone |
   | `priority` | 0–100 |
   | `dailyCapPerUser` | 1–10 |
+  | `segments` | Up to 20 tags (`a-z 0-9 -`), or `null` for everyone |
+  | `maxDeliveries`, `maxConversions` | Optional budgets: stop after this many shown / matched purchases |
+  | `holdoutPct` | 0–50, default 10: the control group |
   | `status` | `draft`, `active` or `paused` |
 
+**Purchases and reports**
+
+- `POST /v1/admin/transactions {transactions: [{ref, installId | customerRef, mid, amount, currency, t}]}` takes up to 1000 per call, from the bank's servers.
+    - A purchase is a **conversion** when its MID belongs to a merchant whose offer this customer was shown (treatment) or held out from (control) in the 7 days before.
+    - Unmatched purchases are not stored. `ref` is stored only as a hash, and sending the same purchase twice is ignored.
+    - Returns `{received, matched, duplicates, unmatched}`.
 - `GET /v1/admin/reports/summary?from&to` (default: the last 30 days) returns:
-  - arrivals and unique installs
-  - arrivals by mall
-  - visits by floor
-  - per offer: shown, opened, dismissed and open rate
+    - arrivals and unique installs;
+    - arrivals by mall and visits by floor;
+    - webhook delivery counts;
+    - per offer:
+        - shown, opened, dismissed and open rate;
+        - `treatment` and `control` (customers, converted, rate; revenue for treatment);
+        - `liftPts`: purchase rate with the offer minus without, in percentage points.
 
 ## Platform routes (Locus)
 
@@ -110,10 +180,10 @@ Then:
 3. Set the repository variable `LOCUS_API_URL` (Settings → Secrets and variables → Actions → Variables) so the console's sign-in page fills in the address.
 4. Keep `CONSOLE_ORIGINS` in `wrangler.toml` set to the console's origin (`https://mrahmedmamdouh.github.io`).
 
-Later schema changes: add `api/migrations/000N_*.sql`, then `npx wrangler d1 migrations apply locus --remote` and `npx wrangler deploy`.
+Webhook retries run every minute from the cron trigger in `wrangler.toml`. Later schema changes: add `api/migrations/000N_*.sql`, then `npx wrangler d1 migrations apply locus --remote` and `npx wrangler deploy`.
 
 ## Limits of the pilot setup
 
 - No rate limiting yet. Cloudflare's free plan can add a rate-limiting rule on `/v1/sdk/*`.
 - The console signs in with the secret key and keeps it in the browser tab's session storage. Before production, replace this with per-user sign-in (SSO) and roles.
-- Daily caps use Muscat midnight for every client. Egyptian clients need their own time zone.
+- The webhook signing secret is stored in the database as is; encrypt it at rest before production.

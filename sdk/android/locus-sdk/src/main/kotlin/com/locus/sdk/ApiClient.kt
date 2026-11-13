@@ -79,6 +79,8 @@ class ApiClient(
         val customerRef: String? = null,
         val segments: List<String> = emptyList(),
         val locale: String = "en",
+        /** True for an in-app list: the API makes no push decision. */
+        val listOnly: Boolean = false,
     )
 
     fun offers(q: OffersQuery, done: (Result<LocusOffersResponse>) -> Unit) {
@@ -90,6 +92,7 @@ class ApiClient(
             .put("locale", q.locale)
             .put("platform", "android")
         q.customerRef?.let { body.put("customerRef", it) }
+        if (q.listOnly) body.put("mode", "list")
         request("POST", "v1/sdk/offers", body, { LocusOffersResponse.fromJson(JSONObject(it)) }, done)
     }
 

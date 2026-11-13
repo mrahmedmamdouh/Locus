@@ -10,7 +10,7 @@ export function Offers({ api }: { api: Api }) {
   const merchants = useLoad(() => api.merchants(), [api.baseUrl]);
   const [editing, setEditing] = useState<Offer | 'new' | null>(null);
   const [filter, setFilter] = useState<'all' | 'live' | 'draft' | 'paused' | 'ended'>('all');
-  const mallName = (id: string) => malls.data?.find((m) => m.id === id)?.name ?? id;
+  const mallName = (id: string | null) => (id ? (malls.data?.find((m) => m.id === id)?.name ?? id) : 'All branches');
 
   const shown = useMemo(
     () => (offers.data ?? []).filter((o) => filter === 'all' || offerState(o) === filter || (filter === 'live' && offerState(o) === 'scheduled')),
@@ -89,7 +89,11 @@ export function Offers({ api }: { api: Api }) {
                     </td>
                     <td>
                       {mallName(o.mallId)}
-                      <div className="muted small">{o.floorLabel ?? 'Whole mall'}{o.storeName ? ` · ${o.storeName}` : ''}</div>
+                      <div className="muted small">
+                        {o.allBranches ? 'Each branch’s floor' : (o.floorLabel ?? 'Whole mall')}
+                        {o.storeName ? ` · ${o.storeName}` : ''}
+                        {o.segments ? ` · ${o.segments.join(', ')}` : ''}
+                      </div>
                     </td>
                     <td className="small">
                       {fmt(o.startsAt)}
@@ -124,6 +128,11 @@ export function Offers({ api }: { api: Api }) {
   );
 }
 
+function branchNote(m: Merchant | undefined): string {
+  if (!m) return '';
+  return m.branchCount === 0 ? 'This merchant has no branches yet: add them on the Merchants tab.' : `Shown on the floor of each of its ${m.branchCount} branches.`;
+}
+
 function alertError(e: unknown) {
   window.alert(e instanceof Error ? e.message : String(e));
 }
@@ -133,7 +142,14 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
   const listed = malls.filter((m) => m.status !== 'pilot');
   const now = new Date();
   const [merchantId, setMerchantId] = useState(offer?.merchant.id ?? merchants[0]?.id ?? '');
+  const [allBranches, setAllBranches] = useState(offer?.allBranches ?? false);
   const [mallId, setMallId] = useState(offer?.mallId ?? pilot[0]?.id ?? malls[0]?.id ?? '');
+  const [titleAr, setTitleAr] = useState(offer?.titleAr ?? '');
+  const [bodyAr, setBodyAr] = useState(offer?.bodyAr ?? '');
+  const [segments, setSegments] = useState(offer?.segments?.join(', ') ?? '');
+  const [maxDeliveries, setMaxDeliveries] = useState(offer?.maxDeliveries == null ? '' : String(offer.maxDeliveries));
+  const [maxConversions, setMaxConversions] = useState(offer?.maxConversions == null ? '' : String(offer.maxConversions));
+  const [holdoutPct, setHoldoutPct] = useState(offer?.holdoutPct ?? 10);
   const [floor, setFloor] = useState<string>(offer?.floorIndex == null ? '' : String(offer.floorIndex));
   const [store, setStore] = useState<{ id: string; name: string } | null>(offer?.storeId ? { id: offer.storeId, name: offer.storeName ?? offer.storeId } : null);
   const [title, setTitle] = useState(offer?.title ?? '');
@@ -173,13 +189,24 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
     const s = localInputToIso(startsAt);
     const en = localInputToIso(endsAt);
     if (!s || !en) return setError('Enter a start and an end.');
+    const segs = segments
+      .split(/[,\s]+/)
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean);
     const input: OfferInput = {
       merchantId,
-      mallId,
-      floorIndex: floor === '' ? null : Number(floor),
-      storeId: store?.id ?? null,
+      allBranches,
+      ...(allBranches ? {} : { mallId }),
+      floorIndex: allBranches || floor === '' ? null : Number(floor),
+      storeId: allBranches ? null : (store?.id ?? null),
       title: title.trim(),
       body: body.trim(),
+      titleAr: titleAr.trim() || null,
+      bodyAr: bodyAr.trim() || null,
+      segments: segs.length ? segs : null,
+      maxDeliveries: maxDeliveries ? Number(maxDeliveries) : null,
+      maxConversions: maxConversions ? Number(maxConversions) : null,
+      holdoutPct,
       ctaUrl: ctaUrl.trim() || null,
       startsAt: s,
       endsAt: en,
@@ -229,6 +256,18 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
               ))}
             </select>
           </label>
+          <fieldset className="where">
+            <legend>Where</legend>
+            <label className="check">
+              <input type="radio" checked={!allBranches} onChange={() => setAllBranches(false)} /> One mall
+            </label>
+            <label className="check">
+              <input type="radio" checked={allBranches} onChange={() => setAllBranches(true)} /> All the merchant’s branches
+            </label>
+            {allBranches && <span className="muted small">{branchNote(merchants.find((m) => m.id === merchantId))}</span>}
+          </fieldset>
+          {!allBranches && (
+          <>
           <label>
             Mall
             <select
@@ -296,6 +335,8 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
               ))}
             </select>
           </label>
+          </>
+          )}
         </div>
         <label>
           Title <span className="muted">({title.length}/80)</span>
@@ -305,6 +346,16 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
           Details <span className="muted">({body.length}/280)</span>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={280} rows={3} placeholder="Valid on purchases over 10 OMR. Show your card at the till." />
         </label>
+        <div className="grid2">
+          <label>
+            Title in Arabic <span className="muted">(optional, {titleAr.length}/80)</span>
+            <input value={titleAr} onChange={(e) => setTitleAr(e.target.value)} maxLength={80} dir="rtl" lang="ar" placeholder="خصم ٢٠٪ عند الدفع ببطاقتك" />
+          </label>
+          <label>
+            Details in Arabic <span className="muted">(optional, {bodyAr.length}/280)</span>
+            <textarea value={bodyAr} onChange={(e) => setBodyAr(e.target.value)} maxLength={280} rows={2} dir="rtl" lang="ar" />
+          </label>
+        </div>
         <label>
           Link <span className="muted">(optional, https)</span>
           <input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} type="url" placeholder="https://yourbank.example/offers/costa" />
@@ -327,6 +378,22 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
             <input type="number" min={1} max={10} value={cap} onChange={(e) => setCap(Number(e.target.value))} />
           </label>
           <label>
+            Customer segments <span className="muted">(optional, comma-separated; empty = everyone)</span>
+            <input value={segments} onChange={(e) => setSegments(e.target.value)} placeholder="visa-infinite, salary" />
+          </label>
+          <label>
+            Stop after this many offers shown <span className="muted">(optional)</span>
+            <input type="number" min={1} value={maxDeliveries} onChange={(e) => setMaxDeliveries(e.target.value)} />
+          </label>
+          <label>
+            Stop after this many purchases <span className="muted">(optional)</span>
+            <input type="number" min={1} value={maxConversions} onChange={(e) => setMaxConversions(e.target.value)} />
+          </label>
+          <label>
+            Control group <span className="muted">(% never shown, to measure the effect)</span>
+            <input type="number" min={0} max={50} value={holdoutPct} onChange={(e) => setHoldoutPct(Number(e.target.value))} />
+          </label>
+          <label>
             Status
             <select value={status} onChange={(e) => setStatus(e.target.value as OfferStatus)}>
               <option value="draft">Draft (not shown)</option>
@@ -335,10 +402,19 @@ function OfferEditor({ api, offer, malls, merchants, onDone }: { api: Api; offer
             </select>
           </label>
         </div>
-        <div className="preview" aria-label="Notification preview">
-          <span className="muted small">Preview</span>
-          <strong>{title || 'Offer title'}</strong>
-          <span>{body || `${store?.name ? `${store.name}, ` : ''}${mall?.name ?? ''}`}</span>
+        <div className="row wrap">
+          <div className="preview" aria-label="Notification preview">
+            <span className="muted small">Preview</span>
+            <strong>{title || 'Offer title'}</strong>
+            <span>{body || (allBranches ? 'At the nearest branch' : `${store?.name ? `${store.name}, ` : ''}${mall?.name ?? ''}`)}</span>
+          </div>
+          {(titleAr || bodyAr) && (
+            <div className="preview" dir="rtl" lang="ar" aria-label="Arabic preview">
+              <span className="muted small">معاينة</span>
+              <strong>{titleAr || title}</strong>
+              <span>{bodyAr || body}</span>
+            </div>
+          )}
         </div>
         {error && <p className="error">{error}</p>}
         <div className="row">

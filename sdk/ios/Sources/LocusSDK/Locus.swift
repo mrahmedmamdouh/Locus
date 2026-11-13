@@ -129,7 +129,9 @@ public final class Locus: NSObject {
             completion(.failure(.notConfigured))
             return
         }
-        api.offers(query(place), completion: completion)
+        var q = query(place)
+        q.listOnly = true
+        api.offers(q, completion: completion)
     }
 
     /// The bank's own pseudonymous reference for the signed-in customer (never a national ID, card or

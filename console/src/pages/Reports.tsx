@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { Api } from '../api';
 import { useLoad } from './useLoad';
 
-const day = (d: Date) => d.toISOString().slice(0, 10);
+// Local calendar date (toISOString would give the UTC date, a day behind in Muscat after midnight).
+const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const pct = (r: number | null) => (r === null ? '—' : `${Math.round(r * 1000) / 10}%`);
 
 export function Reports({ api }: { api: Api }) {
   const [from, setFrom] = useState(day(new Date(Date.now() - 29 * 86_400_000)));
@@ -99,31 +101,55 @@ export function Reports({ api }: { api: Api }) {
 
           <div className="card">
             <h3>Offers</h3>
+            <p className="muted small">
+              Purchases are card payments at the merchant within 7 days, sent by your servers. “Without offer” is the control group: customers who would have received the offer
+              but were held back. Lift is the difference in purchase rate, in percentage points; with fewer than about 100 customers in each group it is mostly noise.
+            </p>
             {s.offers.length === 0 ? (
               <p className="muted">No offers shown in this period.</p>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Offer</th>
-                    <th className="num">Shown</th>
-                    <th className="num">Opened</th>
-                    <th className="num">Dismissed</th>
-                    <th className="num">Open rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.offers.map((o) => (
-                    <tr key={o.offerId}>
-                      <td>{o.title ?? <span className="muted">deleted offer</span>}</td>
-                      <td className="num">{o.delivered}</td>
-                      <td className="num">{o.opened}</td>
-                      <td className="num">{o.dismissed}</td>
-                      <td className="num">{o.openRate === null ? '—' : `${Math.round(o.openRate * 100)}%`}</td>
+              <div className="table-wrap flat">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Offer</th>
+                      <th className="num">Shown</th>
+                      <th className="num">Opened</th>
+                      <th className="num">Bought (with offer)</th>
+                      <th className="num">Bought (without)</th>
+                      <th className="num">Lift</th>
+                      <th className="num">Sales</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {s.offers.map((o) => (
+                      <tr key={o.offerId}>
+                        <td>{o.title ?? <span className="muted">deleted offer</span>}</td>
+                        <td className="num">{o.delivered}</td>
+                        <td className="num">
+                          {o.opened}
+                          <div className="muted small">{pct(o.openRate)}</div>
+                        </td>
+                        <td className="num">
+                          {o.treatment.converted} / {o.treatment.customers}
+                          <div className="muted small">{pct(o.treatment.rate)}</div>
+                        </td>
+                        <td className="num">
+                          {o.control.converted} / {o.control.customers}
+                          <div className="muted small">{pct(o.control.rate)}</div>
+                        </td>
+                        <td className="num">{o.liftPts === null ? '—' : <strong className={o.liftPts > 0 ? 'ok-text' : ''}>{o.liftPts > 0 ? '+' : ''}{o.liftPts} pts</strong>}</td>
+                        <td className="num">{o.treatment.revenue ? o.treatment.revenue.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {Object.keys(s.webhooks).length > 0 && (
+              <p className="muted small">
+                Webhook deliveries: {s.webhooks.sent ?? 0} sent, {s.webhooks.failed ?? 0} failed, {s.webhooks.expired ?? 0} expired, {s.webhooks.pending ?? 0} pending.
+              </p>
             )}
           </div>
         </>

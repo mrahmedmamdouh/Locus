@@ -126,6 +126,43 @@ After the customer grants fine location and then background location, call `Locu
 
 Phones without a pressure sensor (for example the Samsung A72 used in the field tests) get **mall-level** offers: arrival works the same, `place.floor` stays `null`, and the API only returns offers you set for the whole mall.
 
+## Customer, segments, language and push delivery
+
+Call these after sign-in, and again when they change (the SDK keeps them on the device):
+
+```swift
+Locus.shared.setCustomerRef("cust-7f3a")              // your pseudonymous reference; nil on sign-out
+Locus.shared.setSegments(["visa-infinite", "salary"]) // offer eligibility; [] = none
+Locus.shared.language = nil                           // nil follows the phone; or "ar" / "en"
+```
+
+```kotlin
+Locus.setCustomerRef("cust-7f3a")
+Locus.setSegments(listOf("visa-infinite", "salary"))
+Locus.language = null
+```
+
+- **`customerRef`** must not be a national ID, card or account number. Use an opaque ID your servers can map back to the customer, such as an HMAC of the customer number under a key only you hold. Locus uses it for two things:
+  - to tell your server whom to push to (webhook mode);
+  - to match the card purchases you send for conversion reports.
+- **Segments** are tags you define (card tier, salary customer, campaign). Offers with segments go only to customers who have one of them.
+- **Language:** offers come back in Arabic when the phone (or `language`) is Arabic and the offer has Arabic text.
+- **Who pushes the offer** is a setting in the console, under Settings → Delivery:
+  - **In the app (SDK)**, the default: the delegate or listener `shouldPresent` gets the offer at once, and your app shows it.
+  - **Through your push service (webhook)**: Locus calls your server instead, and the SDK does not ask your app to show anything. `offersHere` still lists the offers for an in-app screen. The webhook format is in [api.md](api.md#delivering-through-the-banks-push-service-webhook).
+- **Measuring purchases:** your servers send card transactions with the merchant ID to `POST /v1/admin/transactions` (see [api.md](api.md)). A share of customers (10% by default) is kept as a control group and never gets that offer, so the report can show the lift the offer caused.
+
+## Apple privacy manifest
+
+The iOS SDK ships `PrivacyInfo.xcprivacy`. It declares:
+
+- no tracking;
+- coarse location (the once-a-day rough position), not linked to the user;
+- device ID (the random install id), usage data (mall visits and floors as results) and product interaction (offer shown, opened, dismissed), linked to the user, for app functionality and analytics;
+- `UserDefaults` access with reason `CA92.1`.
+
+Xcode merges it into your app's privacy report. Your App Store privacy answers should match it.
+
 ## Testing without going to a mall
 
 - Point the SDK at a local API (`npm run dev --workspace api`, see [api.md](api.md)) and create a test mall around your office with the platform route `PUT /v1/platform/malls/{id}` (status `pilot`).

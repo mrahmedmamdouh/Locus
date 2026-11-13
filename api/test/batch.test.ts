@@ -236,6 +236,17 @@ describe('push rules', () => {
     expect((await deliver(2)).reason).toBe('daily-limit');
   });
 
+  it('lists offers for an in-app screen without a push decision', async () => {
+    const m = (await env.call('POST', '/v1/admin/merchants', env.sec, { name: 'Carrefour' })).json.merchant;
+    await env.call('POST', '/v1/admin/offers', env.sec, offer(m.id, { holdoutPct: 50 }));
+    for (let i = 0; i < 10; i++) {
+      const r = await env.call('POST', '/v1/sdk/offers', env.pub, { installId: `install-${3000 + i}`, mallId: 'mall-of-oman', floorIndex: 0, mode: 'list' });
+      expect(r.json).toMatchObject({ push: null, delivery: null, reason: 'list' });
+      expect(r.json.offers).toHaveLength(1);
+    }
+    expect((await env.db.first<{ n: number }>("SELECT COUNT(*) AS n FROM events WHERE type = 'offer_held_out'"))!.n).toBe(0);
+  });
+
   it('stops an offer at its delivery budget', async () => {
     const m = (await env.call('POST', '/v1/admin/merchants', env.sec, { name: 'Carrefour' })).json.merchant;
     const o = (await env.call('POST', '/v1/admin/offers', env.sec, offer(m.id, { maxDeliveries: 1 }))).json.offer;

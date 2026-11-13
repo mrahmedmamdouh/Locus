@@ -68,6 +68,8 @@ public final class LocusAPIClient {
         let customerRef: String?
         let segments: [String]
         let locale: String
+        /// True for an in-app list: the API makes no push decision.
+        var listOnly = false
     }
 
     func offers(_ q: OffersQuery, completion: @escaping (Result<LocusOffersResponse, LocusError>) -> Void) {
@@ -82,8 +84,9 @@ public final class LocusAPIClient {
                 try c.encode(q.segments, forKey: .segments)
                 try c.encode(q.locale, forKey: .locale)
                 try c.encode("ios", forKey: .platform)
+                if q.listOnly { try c.encode("list", forKey: .mode) }
             }
-            enum CodingKeys: String, CodingKey { case installId, mallId, floorIndex, customerRef, segments, locale, platform }
+            enum CodingKeys: String, CodingKey { case installId, mallId, floorIndex, customerRef, segments, locale, platform, mode }
         }
         let body = try? JSONEncoder().encode(Body(q: q))
         request("POST", "v1/sdk/offers", body: body, completion: completion)

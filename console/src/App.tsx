@@ -4,13 +4,15 @@ import { Malls } from './pages/Malls';
 import { Merchants } from './pages/Merchants';
 import { Offers } from './pages/Offers';
 import { Reports } from './pages/Reports';
+import { Settings } from './pages/Settings';
 
-type Tab = 'offers' | 'merchants' | 'malls' | 'reports';
+type Tab = 'offers' | 'merchants' | 'malls' | 'reports' | 'settings';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'offers', label: 'Offers' },
   { id: 'merchants', label: 'Merchants' },
   { id: 'malls', label: 'Malls' },
   { id: 'reports', label: 'Reports' },
+  { id: 'settings', label: 'Settings' },
 ];
 const SESSION_KEY = 'locus-console-session';
 const DEFAULT_API = (import.meta.env.VITE_LOCUS_API_URL as string | undefined) ?? '';
@@ -78,6 +80,7 @@ export function App() {
         {tab === 'merchants' && <Merchants api={api} />}
         {tab === 'malls' && <Malls api={api} />}
         {tab === 'reports' && <Reports api={api} />}
+        {tab === 'settings' && <Settings api={api} />}
       </main>
     </div>
   );
