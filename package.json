@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "app",
-    "dashboard"
+    "dashboard",
+    "api"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",

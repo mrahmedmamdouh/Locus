@@ -1,0 +1,15 @@
+# Cloudflare Workers + D1 (both have free tiers). See docs/api.md → "Deploy".
+name = "locus-api"
+main = "src/worker.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Browser origins allowed to call /v1/admin (the bank console on GitHub Pages).
+CONSOLE_ORIGINS = "https://mrahmedmamdouh.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "locus"
+# Fill in after `npx wrangler d1 create locus`:
+database_id = "REPLACE_WITH_DATABASE_ID"
+migrations_dir = "migrations"

@@ -9,3 +9,4 @@ export * from './sample';
 export * from './device';
 export * from './wifi';
 export * from './drift';
+export * from './visit';
