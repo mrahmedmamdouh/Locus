@@ -162,7 +162,7 @@ export async function demoActivity(db: Db, tenantId: string, now: Date, from: nu
     const segments = r() < 0.2 ? ['visa-infinite'] : [];
     const firstDay = Math.floor(r() * DEMO_DAYS);
     const tConsent = now.getTime() - (DEMO_DAYS - firstDay) * 86_400_000 - 3_600_000;
-    if (r() < 0.12) continue; // never opted in: nothing is stored for them
+    if (n >= 20 && r() < 0.12) continue; // never opted in: nothing is stored for them (the first 20 always opt in, for demos)
     consents.push([tenantId, install, `demo-cust-${n}`, 'mall_offers', 'granted', 'demo-mall-offers-2026-11', null, r() < 0.3 ? 'ar' : 'en', platform, 'app', iso(tConsent), received]);
     installs.push([tenantId, install, `demo-cust-${n}`, segments.length ? JSON.stringify(segments) : null, r() < 0.3 ? 'ar' : 'en', platform, received]);
     const visits = 1 + Math.floor(r() * 4);
