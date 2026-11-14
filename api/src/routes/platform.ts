@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { generateKey, sha256Hex, type KeyKind } from '../auth';
 import type { SqlValue } from '../db';
 import { COUNTRIES, floorsByMall, mallJson, readBody, type MallRow, type Services, type Vars } from '../shared';
+import { DEMO_BATCH, DEMO_INSTALLS, demoActivity, demoSetup } from '../demo';
 import { isValidTimeZone } from '../time';
 import { ApiError, bad, ID_PATTERN, int, num, obj, oneOf, optInt, optStr, str } from '../validate';
 
@@ -54,6 +55,30 @@ export function platformRoutes(svc: Services, auth: (c: never, next: () => Promi
     const kind = oneOf(b.kind, 'kind', ['publishable', 'secret'] as const);
     if (!(await db.first('SELECT 1 FROM tenants WHERE id = ?', [c.req.param('id')]))) throw new ApiError(404, 'not_found', 'Unknown client.');
     return c.json({ key: await issueKey(c.req.param('id'), kind) }, 201);
+  });
+
+  /**
+   * Demo data for sales demos, only for clients whose id starts with "demo". In steps so each
+   * request stays small: POST …/demo-data wipes the client and creates merchants and offers, then
+   * POST …/demo-data/activity {"from":0} … adds synthetic customers in batches until "next" is null.
+   */
+  const demoClient = async (id: string) => {
+    if (!id.startsWith('demo')) throw new ApiError(403, 'forbidden', 'Demo data can only be loaded into a client whose id starts with "demo".');
+    if (!(await db.first('SELECT 1 FROM tenants WHERE id = ?', [id]))) throw new ApiError(404, 'not_found', 'Unknown client.');
+  };
+  platform.post('/tenants/:id/demo-data', async (c) => {
+    const id = c.req.param('id');
+    await demoClient(id);
+    if (!(await db.first("SELECT 1 FROM malls WHERE status = 'pilot'"))) throw bad('Upload the places catalogue first: demo merchants are matched to its stores.');
+    return c.json({ ...(await demoSetup(db, id, now())), next: 0 });
+  });
+  platform.post('/tenants/:id/demo-data/activity', async (c) => {
+    const id = c.req.param('id');
+    await demoClient(id);
+    const b = await readBody(c);
+    const from = b.from === undefined ? 0 : int(b.from, 'from', 0, DEMO_INSTALLS);
+    const r = await demoActivity(db, id, now(), from, DEMO_BATCH);
+    return c.json({ ...r, next: from + DEMO_BATCH < DEMO_INSTALLS ? from + DEMO_BATCH : null });
   });
 
   platform.post('/keys/:id/revoke', async (c) => {

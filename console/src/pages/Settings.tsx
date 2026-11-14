@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { Api, ConsentRecord, Settings as S } from '../api';
+import type { Api, AuditEntry, ConsentRecord, Settings as S } from '../api';
 import { useLoad } from './useLoad';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -31,6 +31,7 @@ export function Settings({ api }: { api: Api }) {
         webhookUrl: form.webhookUrl?.trim() || null,
         deliveryMode: form.deliveryMode,
         consentMode: form.consentMode,
+        retentionDays: form.retentionDays,
       });
       s.setData(saved);
       setMsg({ ok: true, text: 'Saved.' });
@@ -112,6 +113,15 @@ export function Settings({ api }: { api: Api }) {
           </span>
         </label>
 
+        <h3>Data retention</h3>
+        <label>
+          Keep visits, offers and purchases for <span className="muted">(days, 30–1095)</span>
+          <input type="number" min={30} max={1095} value={form.retentionDays} onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
+        </label>
+        <p className="muted small">
+          Deleted every night after this period. Consent records are kept 5 years as proof, the activity log 2 years, webhook deliveries 30 days.
+        </p>
+
         <h3>Delivery</h3>
         <label className="check">
           <input type="radio" checked={form.deliveryMode === 'sdk'} onChange={() => setForm({ ...form, deliveryMode: 'sdk' })} />
@@ -150,6 +160,7 @@ export function Settings({ api }: { api: Api }) {
       </form>
 
       <ConsentLookup api={api} />
+      <ActivityLog api={api} />
 
       {deliveries.data && deliveries.data.length > 0 && (
         <div className="card">
@@ -269,6 +280,60 @@ function ConsentLookup({ api }: { api: Api }) {
             </button>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/** Changes made with this bank's secret key or by Locus operators: who, what, when. */
+function ActivityLog({ api }: { api: Api }) {
+  const log = useLoad(() => api.audit(), [api.baseUrl]);
+  const [open, setOpen] = useState(false);
+  const who = (e: AuditEntry) => (e.actor === 'locus-operator' ? 'Locus operator' : `Key ${e.actor}…`);
+  return (
+    <div className="card">
+      <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <h3>Activity log</h3>
+          <p className="muted small">Every change to offers, merchants and settings, with the key that made it. Reads are not logged.</p>
+        </div>
+        <button className="secondary" onClick={() => setOpen(!open)}>
+          {open ? 'Hide' : `Show${log.data ? ` (${log.data.length})` : ''}`}
+        </button>
+      </div>
+      {open && log.error && <p className="error">{log.error}</p>}
+      {open && log.data && (
+        log.data.length === 0 ? (
+          <p className="muted">No changes yet.</p>
+        ) : (
+          <div className="table-wrap flat">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Who</th>
+                  <th>Change</th>
+                  <th className="num">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.data.map((e, i) => (
+                  <tr key={i}>
+                    <td className="small">{new Date(e.t).toLocaleString()}</td>
+                    <td className="small">
+                      {who(e)}
+                      {e.country ? <span className="muted"> · {e.country}</span> : null}
+                    </td>
+                    <td className="small">
+                      <code>{e.method}</code> {e.path.replace(/^\/v1\/(admin|platform)/, '')}
+                    </td>
+                    <td className="num small">{e.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );

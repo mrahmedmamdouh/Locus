@@ -139,12 +139,19 @@ Locus-Signature: t=1795000000,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>
         - `treatment` and `control` (customers, converted, rate; revenue for treatment);
         - `liftPts`: purchase rate with the offer minus without, in percentage points.
 
+**Data retention and the activity log**
+
+- `retentionDays` in `PATCH /v1/admin/settings` (30–1095, default 395): visits, offers shown, purchases and installs older than this are deleted every night (cron `0 2 * * *` on Workers; a daily timer on Node).
+- Fixed periods: consent records 5 years after the customer's last choice (proof of consent), the activity log 2 years, webhook deliveries 30 days.
+- `GET /v1/admin/audit` returns the last 200 changes (not reads) made with this client's secret key or by Locus operators: key prefix or `locus-operator`, method, path, status, country and time. Request bodies and keys are never logged.
+
 ## Platform routes (Locus)
 
 - `POST /v1/platform/tenants {id?, name, country: OM|EG}` creates a client and returns its publishable and secret keys **once**.
 - `GET /v1/platform/tenants` lists clients with key prefixes. `POST /v1/platform/tenants/{id}/keys {kind}` issues a key; `POST /v1/platform/keys/{id}/revoke` revokes one.
 - `PUT /v1/platform/malls/{id}` creates or replaces a mall and its floor table. The fields are name, city, country, lat, lon, radiusM, entranceFloorIndex, status (`pilot` | `listed`) and floors. Floors are validated: sorted and non-overlapping.
 - `POST /v1/platform/malls/{id}/stores {stores, replace?}` adds or updates stores, up to 2000 per call.
+- **Demo data** (only for clients whose id starts with `demo`; needs the catalogue): `POST /v1/platform/tenants/{id}/demo-data` wipes the client and creates 5 merchants (with MIDs, branches matched to the catalogue) and 5 offers in English and Arabic, then `POST /v1/platform/tenants/{id}/demo-data/activity {from}` adds synthetic customers in batches of 100 until `next` is `null`: about 1,000 opted-in customers and four weeks of visits, floors, offers, control groups and purchases. Install ids start with `demo-`. In the console: Clients → *Fill with demo data*.
 
 The three pilot malls (Mall of Oman, Oman Avenues Mall, City Centre Muscat) are created by migration [`0002_pilot_malls.sql`](../api/migrations/0002_pilot_malls.sql), with the floor heights measured in the field tests.
 

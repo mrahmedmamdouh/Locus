@@ -91,6 +91,7 @@ export interface TenantRow {
   quiet_end: string | null;
   max_pushes_per_day: number;
   consent_mode: 'sdk' | 'bank';
+  retention_days: number;
 }
 
 export const OFFER_SELECT = `SELECT o.*, m.name AS merchant_name, m.name_ar AS merchant_name_ar, s.name AS store_name FROM offers o

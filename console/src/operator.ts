@@ -36,6 +36,22 @@ export class PlatformApi {
     this.req<{ tenant: { id: string; name: string; country: string }; keys: { publishable: string; secret: string } }>('POST', '/v1/platform/tenants', t);
   newKey = (tenantId: string, kind: 'publishable' | 'secret') => this.req<{ key: { key: string; prefix: string } }>('POST', `/v1/platform/tenants/${tenantId}/keys`, { kind });
   revokeKey = (keyId: string) => this.req('POST', `/v1/platform/keys/${keyId}/revoke`, {});
+
+  /** Fills a demo client (id starting with "demo") with sample merchants, offers and four weeks of activity. */
+  async loadDemoData(tenantId: string, progress: (done: number, total: number) => void) {
+    type Step = { next: number | null; installs?: number; customers?: number; events?: number; purchases?: number };
+    const setup = await this.req<Step & { merchants: number; offers: number; branches: number; installs: number }>('POST', `/v1/platform/tenants/${tenantId}/demo-data`, {});
+    let next = setup.next;
+    let customers = 0;
+    while (next !== null) {
+      progress(next, setup.installs);
+      const r: Step = await this.req<Step>('POST', `/v1/platform/tenants/${tenantId}/demo-data/activity`, { from: next });
+      customers += r.customers ?? 0;
+      next = r.next;
+    }
+    progress(setup.installs, setup.installs);
+    return { merchants: setup.merchants, offers: setup.offers, branches: setup.branches, customers };
+  }
 }
 
 const PILOT = new Set(['mall-of-oman', 'oman-avenues-mall', 'city-centre-muscat']);

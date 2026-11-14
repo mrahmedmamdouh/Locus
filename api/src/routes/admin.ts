@@ -83,6 +83,7 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
     quietHours: t.quiet_start && t.quiet_end ? { start: t.quiet_start, end: t.quiet_end } : null,
     maxPushesPerDay: t.max_pushes_per_day,
     consentMode: t.consent_mode,
+    retentionDays: t.retention_days,
   });
 
   admin.get('/settings', async (c) => c.json({ settings: settingsJson(await tenantOf(c.get('tenantId'))) }));
@@ -113,7 +114,8 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
     }
     const max = b.maxPushesPerDay === undefined ? cur.max_pushes_per_day : int(b.maxPushesPerDay, 'maxPushesPerDay', 1, 20);
     const consentMode = b.consentMode === undefined ? cur.consent_mode : oneOf(b.consentMode, 'consentMode', ['sdk', 'bank'] as const);
-    await db.run('UPDATE tenants SET timezone = ?, delivery_mode = ?, webhook_url = ?, quiet_start = ?, quiet_end = ?, max_pushes_per_day = ?, consent_mode = ? WHERE id = ?', [
+    const retentionDays = b.retentionDays === undefined ? cur.retention_days : int(b.retentionDays, 'retentionDays', 30, 1095);
+    await db.run('UPDATE tenants SET timezone = ?, delivery_mode = ?, webhook_url = ?, quiet_start = ?, quiet_end = ?, max_pushes_per_day = ?, consent_mode = ?, retention_days = ? WHERE id = ?', [
       timezone,
       deliveryMode,
       webhookUrl,
@@ -121,6 +123,7 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
       quietEnd,
       max,
       consentMode,
+      retentionDays,
       cur.id,
     ]);
     return c.json({ settings: settingsJson(await tenantOf(cur.id)) });
@@ -149,6 +152,15 @@ export function adminRoutes(svc: Services, auth: (c: never, next: () => Promise<
     } catch (e) {
       return c.json({ ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' });
     }
+  });
+
+  /** Changes made with this client's secret keys (and by Locus operators on this client), newest first. */
+  admin.get('/audit', async (c) => {
+    const rows = await db.all<{ actor: string; method: string; path: string; status: number; ip_country: string | null; t: string }>(
+      'SELECT actor, method, path, status, ip_country, t FROM audit_log WHERE tenant_id = ? ORDER BY id DESC LIMIT 200',
+      [c.get('tenantId')],
+    );
+    return c.json({ entries: rows.map((r) => ({ actor: r.actor, method: r.method, path: r.path, status: r.status, country: r.ip_country, t: r.t })) });
   });
 
   admin.get('/deliveries', async (c) => {

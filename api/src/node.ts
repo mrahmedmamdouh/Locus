@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './app';
 import { sha256Hex } from './auth';
 import { openNodeDb } from './db-node';
+import { purgeExpired } from './retention';
 import { retryDueDeliveries } from './webhook';
 
 /**
@@ -22,3 +23,5 @@ serve({ fetch: app.fetch, port });
 // Retry bank webhooks that failed, like the Workers cron.
 setInterval(() => void retryDueDeliveries(db, (url, init) => fetch(url, init), new Date()).catch((e) => console.error(e)), 60_000);
 console.log(`Locus API on http://localhost:${port}${platformKey ? '' : ' (platform routes off: set LOCUS_PLATFORM_KEY)'}`);
+// Retention purge, daily.
+setInterval(() => void purgeExpired(db, new Date()).catch((e) => console.error(e)), 24 * 3600_000);

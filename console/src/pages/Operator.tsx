@@ -16,6 +16,19 @@ function Clients({ api }: { api: PlatformApi }) {
   const [country, setCountry] = useState('OM');
   const [shown, setShown] = useState<{ title: string; lines: [string, string][] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [demo, setDemo] = useState<string | null>(null);
+
+  const fillDemo = async (t: Tenant) => {
+    if (!window.confirm(`Replace everything in ${t.name} with demo data? Its merchants, offers, visits and purchases are deleted first.`)) return;
+    setError(null);
+    try {
+      const r = await api.loadDemoData(t.id, (done, total) => setDemo(`Loading demo data into ${t.name}: ${Math.round((done / total) * 100)}%`));
+      setDemo(`${t.name}: ${r.merchants} merchants (${r.branches} branches matched), ${r.offers} offers and four weeks of activity from ${r.customers} customers. Open it as the bank to see the reports.`);
+    } catch (err) {
+      setDemo(null);
+      setError(errText(err));
+    }
+  };
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -101,6 +114,7 @@ function Clients({ api }: { api: PlatformApi }) {
         <button className="primary align-end">Create client</button>
       </form>
       {error && <p className="error">{error}</p>}
+      {demo && <p className="note">{demo}</p>}
       {list.error && <p className="error">{list.error}</p>}
       {list.data && (
         <div className="table-wrap">
@@ -142,6 +156,11 @@ function Clients({ api }: { api: PlatformApi }) {
                     <button className="link" onClick={() => issue(t, 'secret')}>
                       New secret key
                     </button>
+                    {t.id.startsWith('demo') && (
+                      <button className="link" onClick={() => fillDemo(t)} title="Sample merchants, offers and four weeks of visits and purchases">
+                        Fill with demo data
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

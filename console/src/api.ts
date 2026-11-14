@@ -124,6 +124,15 @@ export interface Settings {
   quietHours: { start: string; end: string } | null;
   maxPushesPerDay: number;
   consentMode: 'sdk' | 'bank';
+  retentionDays: number;
+}
+export interface AuditEntry {
+  actor: string;
+  method: string;
+  path: string;
+  status: number;
+  country: string | null;
+  t: string;
 }
 export interface ConsentRecord {
   installId: string;
@@ -222,6 +231,7 @@ export class Api {
   consents = (q: { installId?: string; customerRef?: string }) =>
     this.req<{ installs: string[]; records: ConsentRecord[] }>('GET', `/v1/admin/consents?${new URLSearchParams(q as Record<string, string>).toString()}`);
   forgetCustomer = (q: { installId?: string; customerRef?: string }) => this.req<{ erasedInstalls: number }>('POST', '/v1/admin/customers/forget', q);
+  audit = () => this.req<{ entries: AuditEntry[] }>('GET', '/v1/admin/audit').then((r) => r.entries);
   deliveries = () => this.req<{ deliveries: Delivery[] }>('GET', '/v1/admin/deliveries').then((r) => r.deliveries);
   summary = (from: string, to: string) => this.req<Summary>('GET', `/v1/admin/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
 }

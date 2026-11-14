@@ -1,5 +1,6 @@
 import { createApp } from './app';
 import { d1Db, type D1Database } from './d1';
+import { purgeExpired } from './retention';
 import { retryDueDeliveries, type FetchLike } from './webhook';
 
 /** Cloudflare Workers entry (wrangler.toml). Secrets: PLATFORM_KEY_SHA256; vars: CONSOLE_ORIGINS. */
@@ -27,7 +28,10 @@ export default {
   },
 
   /** Every minute (wrangler.toml [triggers]): retry bank webhooks that failed, expire stale ones. */
-  scheduled(_event: unknown, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(retryDueDeliveries(d1Db(env.DB), fetchImpl, new Date()));
+  scheduled(event: { cron?: string }, env: Env, ctx: ExecutionContext) {
+    const db = d1Db(env.DB);
+    // Nightly (02:00 UTC): delete what is past its retention. Every minute: webhook retries.
+    if (event.cron === '0 2 * * *') ctx.waitUntil(purgeExpired(db, new Date()).then((r) => console.log('retention purge', JSON.stringify(r))));
+    else ctx.waitUntil(retryDueDeliveries(db, fetchImpl, new Date()));
   },
 };

@@ -183,6 +183,18 @@ The iOS SDK ships `PrivacyInfo.xcprivacy`. It declares:
 
 Xcode merges it into your app's privacy report. Your App Store privacy answers should match it.
 
+## Battery and background
+
+The SDK relies on the operating system's own arrival and exit alerts, not on a running GPS:
+
+- **iOS:** region monitoring (`CLCircularRegion`, up to 20 malls nearest the customer). iOS wakes the app for a few seconds at the boundary; the SDK takes the baseline, reports the visit and goes back to sleep. Continuous location runs only while your app is open, or in the background when you set `backgroundFloorTracking = true`.
+- **Android:** Geofencing API (Play services) plus the last known location to pick the nearest malls. No location updates run in the background unless `backgroundFloorTracking` is on, which needs a foreground service with a visible notification.
+- **Barometer:** read only during a visit (inside a mall boundary), never outside one.
+
+`backgroundFloorTracking` is **off by default**. With it off, a customer who never opens the app inside the mall gets mall-level offers only (arrival, entrance floor), which is the setting we recommend for the pilot and the one that passes App Store review most easily.
+
+(The Locus Field test app keeps GPS running while it is open to record test data; that is a test-tool behaviour, not the SDK's.)
+
 ## Demo bank app
 
 A working example of everything above for both platforms, used for QA and field tests: see [demo-app.md](demo-app.md).

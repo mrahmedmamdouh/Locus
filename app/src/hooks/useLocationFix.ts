@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import * as Location from 'expo-location';
+import { AppState } from 'react-native';
 import { createSimulator } from '../logic/simulator';
 import type { GpsFix } from '../logic/types';
 
@@ -77,9 +78,19 @@ export function useLocationFix(opts: { demo: boolean; simHeightRef: MutableRefOb
     }
   }, [applyPermission]);
 
+  // GPS runs only while the app is on screen. In the background the OS geofence alerts do the work
+  // (that is all the bank SDK uses too): a running GPS watch there drains the battery and is what
+  // App Review questions.
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => setActive(s === 'active'));
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     latestRef.current = null;
     setLatest(null);
+    if (!active) return;
     if (demo) {
       const sim = createSimulator();
       const id = setInterval(() => publish(sim.gpsAt(simHeightRef.current, Date.now())), 1000);
@@ -103,7 +114,7 @@ export function useLocationFix(opts: { demo: boolean; simHeightRef: MutableRefOb
       cancelled = true;
       sub?.remove();
     };
-  }, [demo, permission, publish, simHeightRef]);
+  }, [active, demo, permission, publish, simHeightRef]);
 
   const waitForFix = useCallback((sinceMs: number, timeoutMs: number) => {
     const cur = latestRef.current;

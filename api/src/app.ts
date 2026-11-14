@@ -50,6 +50,25 @@ export function createApp(deps: AppDeps) {
     if (!row) throw new ApiError(401, 'unauthorized', 'Unknown or revoked key.');
     c.set('tenantId', row.tenant_id);
     await next();
+    if (kind === 'secret') await audit(c, row.tenant_id, key.slice(0, 12));
+  };
+
+  /** Records changes (not reads) made with secret or platform keys: who, what, when. Never bodies or keys. */
+  const audit = async (c: Ctx, tenantId: string | null, actor: string) => {
+    if (c.req.method === 'GET' || c.req.method === 'OPTIONS') return;
+    try {
+      await db.run('INSERT INTO audit_log (tenant_id, actor, method, path, status, ip_country, t) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+        tenantId,
+        actor,
+        c.req.method,
+        new URL(c.req.url).pathname.slice(0, 200),
+        c.res.status,
+        c.req.header('CF-IPCountry') ?? null,
+        svc.now().toISOString(),
+      ]);
+    } catch (e) {
+      console.error('audit log failed', e);
+    }
   };
 
   const requirePlatform = async (c: Ctx, next: () => Promise<void>) => {
@@ -58,6 +77,10 @@ export function createApp(deps: AppDeps) {
       throw new ApiError(401, 'unauthorized', 'Platform key required.');
     }
     await next();
+    // The demo-data batches are logged once, by the setup call that starts them.
+    if (c.req.path.endsWith('/demo-data/activity')) return;
+    const m = /^\/v1\/platform\/tenants\/([a-z0-9-]+)/.exec(new URL(c.req.url).pathname);
+    await audit(c, m ? m[1]! : null, 'locus-operator');
   };
 
   app.route('/v1/sdk', sdkRoutes(svc, requireKey('publishable') as never));
